@@ -44,6 +44,7 @@ booking:
     datasource-password: ${BOOKING_VECTOR_DB_PASSWORD:postgres}
     embedding-api-key: ${OPENAI_API_KEY:}
     embedding-base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    embedding-path: ${OPENAI_EMBEDDING_PATH:/v1/embeddings}
     embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
     dimensions: ${BOOKING_VECTOR_DIMENSIONS:1536}
     schema-name: public

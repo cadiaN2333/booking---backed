@@ -14,6 +14,7 @@ public class VectorStoreProperties {
   private String datasourcePassword;
   private String embeddingApiKey;
   private String embeddingBaseUrl;
+  private String embeddingPath = "/v1/embeddings";
   private String embeddingModel;
   private int dimensions = 1536;
   private String schemaName = "public";

@@ -48,13 +48,17 @@ public class VectorStoreConfig {
     OpenAiApi api =
         OpenAiApi.builder()
             .baseUrl(properties.getEmbeddingBaseUrl())
+            .embeddingsPath(properties.getEmbeddingPath())
             .apiKey(properties.getEmbeddingApiKey())
             .restClientBuilder(restClientBuilder)
             .build();
     return new OpenAiEmbeddingModel(
         api,
         MetadataMode.EMBED,
-        OpenAiEmbeddingOptions.builder().model(properties.getEmbeddingModel()).build());
+        OpenAiEmbeddingOptions.builder()
+            .model(properties.getEmbeddingModel())
+            .dimensions(properties.getDimensions())
+            .build());
   }
 
   @Bean

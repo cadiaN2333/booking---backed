@@ -38,7 +38,9 @@ $env:OPENAI_API_KEY = "你的 Embedding 服务密钥"
 java -jar target/booking-backend-1.0.0.jar
 ```
 
-可通过 `BOOKING_VECTOR_DB_URL`、`BOOKING_VECTOR_DB_USERNAME`、`BOOKING_VECTOR_DB_PASSWORD`、`OPENAI_BASE_URL`、`OPENAI_EMBEDDING_MODEL` 和 `BOOKING_VECTOR_DIMENSIONS` 覆盖默认配置。生产环境不要把密钥写进配置文件。
+可通过 `BOOKING_VECTOR_DB_URL`、`BOOKING_VECTOR_DB_USERNAME`、`BOOKING_VECTOR_DB_PASSWORD`、`OPENAI_BASE_URL`、`OPENAI_EMBEDDING_PATH`、`OPENAI_EMBEDDING_MODEL` 和 `BOOKING_VECTOR_DIMENSIONS` 覆盖默认配置。生产环境不要把密钥写进配置文件。
+
+若使用阿里云百炼的千问向量模型，可使用 OpenAI 兼容模式。推荐 `text-embedding-v4` 配置为 1536 维；百炼工作空间 Base URL 通常形如 `https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1`，此时设置 `OPENAI_EMBEDDING_PATH=/embeddings`。API Key 仍通过 `OPENAI_API_KEY` 传入，不能写入仓库。
 
 ## 接口契约自检
 
