@@ -6,7 +6,7 @@
 
 **架构：** 业务稳定键继续作为 metadata 中的 `documentKey`，用于删除旧文档；Spring AI `Document.id` 改为由稳定键生成的名称型 UUID。名称型 UUID 保证同一场地重复重建得到相同物理 ID，不需要新增表或映射关系。
 
-**技术栈：** Java 21、Spring Boot、Spring AI 1.0.9、PgVector、JUnit 5、AssertJ、Mockito、Maven。
+**技术栈：** Java 17（当前以 JDK 21 运行）、Spring Boot、Spring AI 1.0.9、PgVector、JUnit 5、AssertJ、Mockito、Maven。
 
 ---
 
