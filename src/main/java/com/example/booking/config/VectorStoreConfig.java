@@ -8,11 +8,14 @@ import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +26,21 @@ import org.springframework.web.client.RestClient;
 @ConditionalOnProperty(name = "booking.vector.enabled", havingValue = "true")
 @EnableConfigurationProperties(VectorStoreProperties.class)
 public class VectorStoreConfig {
+
+  /** 向量开关打开后，显式保留 MySQL 为全局主数据源，避免被 PostgreSQL 顶替。 */
+  @Bean(name = "bookingMainDataSourceProperties")
+  @ConfigurationProperties("spring.datasource")
+  public DataSourceProperties mainDataSourceProperties() {
+    return new DataSourceProperties();
+  }
+
+  @Bean(name = "dataSource")
+  @Primary
+  public DataSource mainDataSource(
+      @org.springframework.beans.factory.annotation.Qualifier("bookingMainDataSourceProperties")
+          DataSourceProperties properties) {
+    return properties.initializeDataSourceBuilder().build();
+  }
 
   @Bean(name = "vectorDataSource")
   public DataSource vectorDataSource(VectorStoreProperties properties) {
@@ -72,7 +90,8 @@ public class VectorStoreConfig {
         .indexType(PgVectorStore.PgIndexType.HNSW)
         .schemaName(properties.getSchemaName())
         .vectorTableName(properties.getTableName())
-        .vectorTableValidationsEnabled(true)
+        // Spring AI 1.0.9 会先校验表再执行 initializeSchema；首次启动时必须关闭前置校验。
+        .vectorTableValidationsEnabled(false)
         .initializeSchema(true)
         .maxDocumentBatchSize(properties.getMaxDocumentBatchSize())
         .build();
