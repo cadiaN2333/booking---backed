@@ -21,7 +21,6 @@ com\example\booking\domain\enums\UserRoleEnum.class
 com\example\booking\domain\dto\RegisterRequest.class
 com\example\booking\job\StockReconcileJob.class
 com\example\booking\service\AuthService.class
-com\example\booking\service\ReleaseScheduler$ReleaseTask.class
 com\example\booking\domain\entity\Reservation.class
 com\example\booking\domain\vo\ReservationVO.class
 com\example\booking\common\GlobalExceptionHandler.class

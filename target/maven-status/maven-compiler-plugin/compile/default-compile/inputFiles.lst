@@ -6,6 +6,8 @@ D:\booking-linked\booking-backend\src\main\java\com\example\booking\common\UserC
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\AuthInterceptor.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\JacksonConfig.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\SecurityBeansConfig.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\VectorStoreConfig.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\VectorStoreProperties.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\config\WebMvcConfig.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\controller\AuthController.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\controller\CourtController.java
@@ -18,6 +20,7 @@ D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\dto\L
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\dto\RegisterRequest.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\Court.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\IdempotentRecord.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\ReleaseTask.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\Reservation.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\Slot.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\domain\entity\User.java
@@ -32,10 +35,18 @@ D:\booking-linked\booking-backend\src\main\java\com\example\booking\job\SlotGene
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\job\StockReconcileJob.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\CourtMapper.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\IdempotentMapper.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\ReleaseTaskMapper.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\ReservationMapper.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\SlotMapper.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\UserMapper.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\mapper\VenueMapper.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeController.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeDocument.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeDocumentFactory.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeRebuildRequest.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeRebuildResult.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeRebuildService.java
+D:\booking-linked\booking-backend\src\main\java\com\example\booking\recommendation\KnowledgeSource.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\service\AuthService.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\service\CourtService.java
 D:\booking-linked\booking-backend\src\main\java\com\example\booking\service\impl\AuthServiceImpl.java
