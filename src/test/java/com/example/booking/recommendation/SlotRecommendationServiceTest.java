@@ -28,7 +28,7 @@ class SlotRecommendationServiceTest {
   }
 
   @Test
-  void recommend_只返回当前场地日期的可约时段并优先傍晚余量() {
+  void recommend_只返回当前场地日期的可约时段并优先傍晚() {
     when(slotService.listByCourtAndDate(101L, DATE))
         .thenReturn(
             List.of(
@@ -44,9 +44,25 @@ class SlotRecommendationServiceTest {
 
     assertThat(result.recommendations())
         .extracting(SlotRecommendationItem::slotId)
-        .containsExactly(3L, 2L, 1L);
+        .containsExactly(2L, 3L, 1L);
     assertThat(result.recommendations()).allMatch(item -> item.available() > 0);
     verify(slotService).listByCourtAndDate(101L, DATE);
+  }
+
+  @Test
+  void recommend_未选择容量时较早时段不会因余量较少落后() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, DATE, "18:00", 1),
+                slot(2L, 101L, DATE, "19:00", 9)));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(RecommendationTag.EVENING), 2));
+
+    assertThat(result.recommendations())
+        .extracting(SlotRecommendationItem::slotId)
+        .containsExactly(1L, 2L);
   }
 
   @Test

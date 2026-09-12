@@ -60,7 +60,7 @@ public class SlotRecommendationService {
   }
 
   private int score(SlotVO slot, Set<RecommendationTag> tags) {
-    int score = slot.getAvailable();
+    int score = 0;
     LocalTime startTime = slot.getStartAt().toLocalTime();
     if (tags.contains(RecommendationTag.EVENING)
         && !startTime.isBefore(EVENING_START)
@@ -69,6 +69,9 @@ public class SlotRecommendationService {
     }
     if (tags.contains(RecommendationTag.EARLIEST)) {
       score += 24 * 60 - startTime.toSecondOfDay() / 60;
+    }
+    if (tags.contains(RecommendationTag.CAPACITY)) {
+      score += slot.getAvailable();
     }
     return score;
   }
