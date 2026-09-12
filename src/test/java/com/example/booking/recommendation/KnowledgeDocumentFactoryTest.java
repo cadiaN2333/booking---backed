@@ -2,8 +2,10 @@ package com.example.booking.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class KnowledgeDocumentFactoryTest {
@@ -35,6 +37,21 @@ class KnowledgeDocumentFactoryTest {
 
     assertThat(second.contentHash()).isEqualTo(first.contentHash());
     assertThat(second.content()).isEqualTo(first.content());
+  }
+
+  @Test
+  void create_生成稳定的UUID文档标识并保留业务稳定键() {
+    KnowledgeDocumentFactory factory = new KnowledgeDocumentFactory();
+
+    var first = factory.create(source()).toSpringAiDocument();
+    var second = factory.create(source()).toSpringAiDocument();
+    String documentKey = "venue:1:court:101:profile";
+
+    UUID.fromString(first.getId());
+    assertThat(second.getId()).isEqualTo(first.getId());
+    assertThat(first.getId())
+        .isEqualTo(UUID.nameUUIDFromBytes(documentKey.getBytes(StandardCharsets.UTF_8)).toString());
+    assertThat(first.getMetadata()).containsEntry("documentKey", documentKey);
   }
 
   private KnowledgeSource source() {

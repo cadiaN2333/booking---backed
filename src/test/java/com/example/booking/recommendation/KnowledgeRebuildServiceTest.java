@@ -12,6 +12,7 @@ import com.example.booking.common.BizException;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -43,8 +44,10 @@ class KnowledgeRebuildServiceTest {
     ArgumentCaptor<List<Document>> captor = ArgumentCaptor.forClass(List.class);
     order.verify(vectorStore).add(captor.capture());
     assertThat(captor.getValue()).singleElement().satisfies(document -> {
-      assertThat(document.getId()).isEqualTo("venue:1:court:101:profile");
-      assertThat(document.getMetadata()).containsEntry("courtId", "101");
+      UUID.fromString(document.getId());
+      assertThat(document.getMetadata())
+          .containsEntry("documentKey", "venue:1:court:101:profile")
+          .containsEntry("courtId", "101");
     });
     assertThat(result.documentKey()).isEqualTo("venue:1:court:101:profile");
     assertThat(result.writtenCount()).isOne();
