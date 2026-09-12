@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS `reservation` (
   `user_id`     BIGINT UNSIGNED NOT NULL,
   `court_id`    BIGINT UNSIGNED NOT NULL,
   `slot_id`     BIGINT UNSIGNED NOT NULL,
+  `active_slot_id` BIGINT UNSIGNED GENERATED ALWAYS AS (
+    CASE WHEN `status` IN (0, 1) THEN `slot_id` ELSE NULL END
+  ) STORED COMMENT '仅有效订单参与唯一约束，取消/超时后允许再次预约',
   `biz_date`    DATE     NOT NULL,
   `start_at`    DATETIME NOT NULL,
   `end_at`      DATETIME NOT NULL,
@@ -83,7 +86,7 @@ CREATE TABLE IF NOT EXISTS `reservation` (
   `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_order_no` (`order_no`),
-  UNIQUE KEY `uk_user_slot` (`user_id`, `slot_id`) COMMENT '防重复预约的最后一道防线',
+  UNIQUE KEY `uk_user_active_slot` (`user_id`, `active_slot_id`) COMMENT '有效订单防重复预约',
   KEY `idx_status_expire` (`status`, `expire_at`),
   KEY `idx_user` (`user_id`, `create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='预约单';

@@ -76,7 +76,7 @@ check('取幂等令牌      应返回字符串', tok, (v) => typeof v === 'strin
 const order = await call('/reservations', {
   method: 'POST',
   token,
-  body: { token: tok, slotId: 20 }
+  body: { token: tok, slotId: availableSlot.id }
 })
 check('下单            应返回对象且带 orderNo', order, (v) => isObject(v) && !!v.orderNo)
 check('订单详情        应返回对象', await call('/reservations/' + order.orderNo, { token }), isObject)
