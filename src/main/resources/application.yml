@@ -1,0 +1,42 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: booking-backend
+
+  datasource:
+    url: 'jdbc:mysql://127.0.0.1:3306/booking?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true'
+    username: root
+    # ↓↓↓ 改成你本机 MySQL 的密码。本机 3306 已有 MySQL 8.0.41 在跑，不需要 Docker。
+    password: lzqzs111
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      # 阶段一不用 Redis，连不上也不影响启动（Lettuce 懒连接）。
+      # 做阶段二前启动 Docker Desktop 执行 `docker compose up -d` 即可。
+
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+booking:
+  # 下单后锁定时长（分钟），超时由释放任务归还库存
+  lock-minutes: 15
+  # 时段默认生成天数
+  generate-days: 14
+
+logging:
+  level:
+    com.example.booking: debug
