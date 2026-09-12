@@ -1,7 +1,7 @@
 # booking-backend · 场地预约排期系统（后端）
 
-Java 17 + Spring Boot 3.3 + MyBatis-Plus + MySQL 8 + Redis。
-当前已完成技术方案的**阶段一：并发防超卖**与**阶段二：Redis 预扣、持久化释放任务、缓存降级和库存校验**。
+Java 17 + Spring Boot 3.4 + MyBatis-Plus + MySQL 8 + Redis；阶段三增加可选 PostgreSQL + pgvector。
+当前已完成技术方案的**阶段一：并发防超卖**、**阶段二：Redis 与释放可靠性**以及**阶段三：向量知识库基础**。
 
 ## 跑起来
 
@@ -25,6 +25,20 @@ java -jar target/booking-backend-1.0.0.jar
 
 前端切到真实后端：把 `booking-frontend/.env.development` 的 `VITE_USE_MOCK` 改成 `false`，
 再配一个 Vite 代理把 `/api` 转发到 `127.0.0.1:8080`（或直接让后端 CORS 放行，已配置）。
+
+### 可选启用阶段三向量知识库
+
+默认不启用，现有 MySQL + Redis 模式无需 PostgreSQL 或模型密钥。需要使用知识重建时执行：
+
+```bash
+docker compose --profile vector up -d
+$env:BOOKING_VECTOR_ENABLED = "true"
+$env:OPENAI_API_KEY = "你的 Embedding 服务密钥"
+"D:/apache-maven-3.9.16/bin/mvn.cmd" -Dmaven.repo.local=D:/booking-linked/.m2 clean package
+java -jar target/booking-backend-1.0.0.jar
+```
+
+可通过 `BOOKING_VECTOR_DB_URL`、`BOOKING_VECTOR_DB_USERNAME`、`BOOKING_VECTOR_DB_PASSWORD`、`OPENAI_BASE_URL`、`OPENAI_EMBEDDING_MODEL` 和 `BOOKING_VECTOR_DIMENSIONS` 覆盖默认配置。生产环境不要把密钥写进配置文件。
 
 ## 接口契约自检
 
@@ -56,6 +70,7 @@ src/main/java/com/example/booking/
 ├── config/          JacksonConfig / WebMvcConfig（CORS + 拦截器注册）
 │                    AuthInterceptor / SecurityBeansConfig（BCrypt）
 ├── controller/      Auth / Venue / Court / Reservation / Merchant
+├── recommendation/  知识文档工厂、PgVector 重建服务、商家重建入口
 ├── service/         SlotService、ReservationService、ReleaseScheduler
 │   └── impl/
 ├── mapper/          MyBatis-Plus，库存变动全部是「单条带条件 UPDATE」
@@ -104,7 +119,7 @@ UPDATE reservation SET status = #{target}, version = version + 1
 ## 幂等三道防线
 
 1. 进入确认页先取令牌，下单时 `UPDATE ... WHERE result IS NULL` 抢占，抢占失败即重复提交
-2. `reservation.uk_user_slot(user_id, slot_id)` 唯一索引，兜住缓存与锁全部失效的极端情况
+2. `reservation.uk_user_active_slot(user_id, active_slot_id)` 唯一索引，兜住缓存与锁全部失效的极端情况
 3. 状态机 CAS，所有状态流转都带 `AND status = ?`
 
 ## 阶段二：Redis 与可靠性实现
@@ -115,6 +130,18 @@ UPDATE reservation SET status = #{target}, version = version + 1
 4. 下单、确认、取消、超时释放后刷新库存缓存并删除日期缓存；缓存异常不回滚数据库事务
 5. 持久化释放任务替代进程内 `DelayQueue`，当前以 MySQL 任务表实现 Outbox；后续接入 MQ 时可复用任务状态机
 6. 并发脚本与单元测试验证库存不超卖、释放重试和库存守恒
+
+## 阶段三：PgVector 知识库
+
+阶段三只建设知识入库基础，不调用聊天模型，也不让模型参与交易：
+
+1. `KnowledgeDocumentFactory` 将场馆、场地类型、价格、营业时间、设施标签和预约规则转换成公开知识文档
+2. 每个场地使用稳定键 `venue:{venueId}:court:{courtId}:profile`，并保存 `documentType`、`venueId`、`courtId`、`courtType`、`status`、`updatedAt`、`contentHash` 元数据
+3. `POST /api/merchant/knowledge/rebuild` 由商家触发单个场地重建；服务端先按稳定键删除旧版本，再写入新版本，重复执行不会累积旧文档
+4. PostgreSQL 通过 `booking_vector_store` 保存向量；实时库存仍只从 MySQL 查询，向量库不保存订单、用户聊天和库存账本
+5. 未开启 `BOOKING_VECTOR_ENABLED` 时，重建接口返回明确的 5030 业务错误，交易接口继续正常运行
+
+生产环境可先执行 `src/main/resources/db/vector-schema.sql`，开发环境也可以让 Spring AI 在启用向量配置后初始化表结构。
 
 ## 用户体系与两端拆分
 

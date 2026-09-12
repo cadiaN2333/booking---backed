@@ -10,4 +10,7 @@ public interface VenueService {
 
   /** 商家端：当前登录商家名下的场馆 */
   List<Venue> listMine();
+
+  /** 按主键读取场馆资料，调用方负责完成权限校验。 */
+  Venue getById(Long venueId);
 }

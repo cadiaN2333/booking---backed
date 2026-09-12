@@ -36,6 +36,19 @@ booking:
   lock-minutes: 15
   # 时段默认生成天数
   generate-days: 14
+  vector:
+    # 阶段三默认关闭；开启前先启动 pgvector 并配置 OPENAI_API_KEY
+    enabled: ${BOOKING_VECTOR_ENABLED:false}
+    datasource-url: ${BOOKING_VECTOR_DB_URL:jdbc:postgresql://127.0.0.1:5432/booking_vector}
+    datasource-username: ${BOOKING_VECTOR_DB_USERNAME:postgres}
+    datasource-password: ${BOOKING_VECTOR_DB_PASSWORD:postgres}
+    embedding-api-key: ${OPENAI_API_KEY:}
+    embedding-base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+    embedding-model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${BOOKING_VECTOR_DIMENSIONS:1536}
+    schema-name: public
+    table-name: booking_vector_store
+    max-document-batch-size: 100
 
 logging:
   level:

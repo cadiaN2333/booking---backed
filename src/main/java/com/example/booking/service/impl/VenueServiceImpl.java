@@ -29,4 +29,9 @@ public class VenueServiceImpl implements VenueService {
             .eq(Venue::getStatus, 1)
             .orderByAsc(Venue::getId));
   }
+
+  @Override
+  public Venue getById(Long venueId) {
+    return venueMapper.selectById(venueId);
+  }
 }

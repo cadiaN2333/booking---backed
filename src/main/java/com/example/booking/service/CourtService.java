@@ -10,4 +10,7 @@ public interface CourtService {
 
   /** 商家端：当前登录商家名下的场地 */
   List<Court> listMine();
+
+  /** 商家端：读取并校验当前商家名下的单个上架场地 */
+  Court getMine(Long courtId);
 }
