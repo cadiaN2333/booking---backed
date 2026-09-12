@@ -1,7 +1,7 @@
 # booking-backend · 场地预约排期系统（后端）
 
 Java 17 + Spring Boot 3.3 + MyBatis-Plus + MySQL 8 + Redis。
-实现的是技术方案里的**阶段一：数据库行锁防超卖**，阶段二的 Redis 预扣留了接入点（见文末）。
+当前已完成技术方案的**阶段一：并发防超卖**与**阶段二：Redis 预扣、持久化释放任务、缓存降级和库存校验**。
 
 ## 跑起来
 
@@ -15,9 +15,9 @@ Java 17 + Spring Boot 3.3 + MyBatis-Plus + MySQL 8 + Redis。
 "C:/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" -h127.0.0.1 -uroot -p < src/main/resources/db/schema.sql
 "C:/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" -h127.0.0.1 -uroot -p < src/main/resources/db/data.sql
 
-# 3) 启动
-mvn spring-boot:run
-# 或者 mvn clean package && java -jar target/booking-backend-1.0.0.jar
+# 3) 编译与启动（如果 Maven 没有加入 PATH，可直接使用本机安装目录）
+"D:/apache-maven-3.9.16/bin/mvn.cmd" -Dmaven.repo.local=D:/booking-linked/.m2 clean package
+java -jar target/booking-backend-1.0.0.jar
 ```
 
 服务在 `http://127.0.0.1:8080`，统一前缀 `/api`。
@@ -34,6 +34,17 @@ node verify-contract.mjs
 
 复刻前端拦截器的解包逻辑，对真实后端逐个接口断言「该是数组的是数组」。
 前端 el-table 的 `:data` 收到对象会渲染报错、loading 遮罩摘不掉，这个脚本专门防这类回归。
+
+## 并发下单验证
+
+确保后端、MySQL、Redis 已启动后执行：
+
+```bash
+node verify-concurrency.mjs
+node verify-concurrency.mjs --concurrency 1000
+```
+
+脚本会选择未来 14 天内真实可用且未被演示账号占用的时段，同时发起并发下单，断言成功数不超过库存；随后取消测试订单，并再次断言 `available + locked + sold = total`。脚本只使用 `customer` 演示账号，若账号已有所有未来时段的有效订单，请先取消一条或改用测试账号。
 
 ## 目录
 
@@ -82,11 +93,13 @@ UPDATE reservation SET status = #{target}, version = version + 1
 竞争同一行的行锁，只有一个能拿到影响行数 1，输的直接跳过后续步骤。
 见 `ReservationMapper#updateStatus`、`ReservationServiceImpl#confirm/release`。
 
-### 3. 超时释放：主链路 + 兜底，两条最终都走幂等 release
+### 3. 超时释放：持久化任务 + 兜底扫描
 
-- 主：`ReleaseScheduler` 用 `DelayQueue` 投递到期任务（真实项目换 RocketMQ 定时消息 / RabbitMQ 延迟插件）
-- 兜：`@Scheduled` 每分钟扫 `status=0 AND expire_at < NOW()`，覆盖进程重启与消息丢失
-- 幂等：`release()` 靠状态机 CAS，重复调用绝不重复归还库存
+- 主：`ReleaseScheduler` 把到期任务写入 `reservation_release_task`，下单事务回滚时任务也回滚；进程重启后仍可继续处理
+- 抢占：任务通过条件 UPDATE 从「待执行」变成「处理中」，多实例不会重复执行同一任务
+- 重试：释放异常时按 5、15、30、60 秒退避重试，处理中任务超时会被恢复
+- 兜底：`@Scheduled` 每分钟扫描 `status=0 AND expire_at < NOW()`，覆盖历史数据、手工数据和异常任务
+- 幂等：`release()` 靠订单状态 CAS，重复调用绝不重复归还库存
 
 ## 幂等三道防线
 
@@ -94,13 +107,14 @@ UPDATE reservation SET status = #{target}, version = version + 1
 2. `reservation.uk_user_slot(user_id, slot_id)` 唯一索引，兜住缓存与锁全部失效的极端情况
 3. 状态机 CAS，所有状态流转都带 `AND status = ?`
 
-## 阶段二：接 Redis 预扣（还没做，给你留的位置）
+## 阶段二：Redis 与可靠性实现
 
-1. `SlotServiceImpl#listByCourtAndDate` 里加 Redis Hash 缓存 `slot:day:{courtId}:{date}`，5 分钟 TTL + 随机抖动
-2. `ReservationServiceImpl#create` 扣库前先跑一段 Lua 预扣 Redis，扣不到直接快速失败
-3. 扣库改走 MQ 异步落库，消费端按 orderNo 幂等
-4. 每日对账 Job 校验 `available + locked + sold = total`
-5. 热点时段加逻辑过期 + SETNX 重建锁，防缓存击穿
+1. `SlotServiceImpl#listByCourtAndDate` 使用 Redis Hash 缓存 `slot:day:{courtId}:{date}`，读取失败自动回源数据库
+2. `ReservationServiceImpl#create` 扣库前使用 Lua 预扣 Redis，MySQL 条件 UPDATE 仍是最终裁决
+3. Redis 计数漂移或不可用时，自动降级到 MySQL，并以数据库最新库存回写 Redis
+4. 下单、确认、取消、超时释放后刷新库存缓存并删除日期缓存；缓存异常不回滚数据库事务
+5. 持久化释放任务替代进程内 `DelayQueue`，当前以 MySQL 任务表实现 Outbox；后续接入 MQ 时可复用任务状态机
+6. 并发脚本与单元测试验证库存不超卖、释放重试和库存守恒
 
 ## 用户体系与两端拆分
 
@@ -149,7 +163,7 @@ BCrypt（`spring-security-crypto`，未引入整套 `spring-boot-starter-securit
 
 - 没有真实支付，`confirm` 就是确认动作
 - 注册时可直接选商家角色，真实项目应走资质审核 + 线下签约
-- 延迟释放用内存 DelayQueue，进程重启靠补偿 Job 兜（真实项目应换 MQ）
+- 当前没有接入真实支付和 MQ；超时释放使用 MySQL 持久化任务表 + 定时处理，已具备重启恢复能力
 - `DataInitializer` 预置演示账号，真实环境应移除
 
 ## 分层约定

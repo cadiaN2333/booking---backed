@@ -149,6 +149,7 @@ public class ReservationServiceImpl implements ReservationService {
     slotMapper.confirmLocked(r.getSlotId());
     refreshStockCache(r.getSlotId());
     safeEvictDay(r.getCourtId(), r.getBizDate().toString());
+    releaseScheduler.finish(orderNo);
   }
 
   @Override
@@ -168,6 +169,7 @@ public class ReservationServiceImpl implements ReservationService {
     slotMapper.releaseLocked(r.getSlotId());
     refreshStockCache(r.getSlotId());
     safeEvictDay(r.getCourtId(), r.getBizDate().toString());
+    releaseScheduler.finish(orderNo);
   }
 
   /** 归属校验，防止通过猜订单号操作别人的预约 */

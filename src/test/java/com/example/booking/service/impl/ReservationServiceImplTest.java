@@ -109,6 +109,7 @@ class ReservationServiceImplTest {
     service.cancel("B1");
 
     verify(slotCacheService).alignStock(1L, 1);
+    verify(releaseScheduler).finish("B1");
   }
 
   private Slot slotWithAvailable(int available) {
