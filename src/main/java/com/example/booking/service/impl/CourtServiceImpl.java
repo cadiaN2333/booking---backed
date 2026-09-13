@@ -10,6 +10,7 @@ import com.example.booking.mapper.CourtMapper;
 import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.CourtService;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,9 @@ public class CourtServiceImpl implements CourtService {
   @Transactional(rollbackFor = Exception.class)
   public Court update(Long courtId, MerchantCourtRequest request) {
     Court court = getMine(courtId);
+    if (!Objects.equals(request.getVenueId(), court.getVenueId())) {
+      throw new BizException("编辑场地时不能修改所属场馆");
+    }
     requireMineVenue(request.getVenueId());
     copyFields(request, court);
     resetForReview(court);

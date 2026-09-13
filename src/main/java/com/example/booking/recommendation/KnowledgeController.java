@@ -28,9 +28,15 @@ public class KnowledgeController {
   public Result<KnowledgeRebuildResult> rebuild(
       @Valid @RequestBody KnowledgeRebuildRequest request) {
     Court court = courtService.getMine(request.getCourtId());
+    if (!isApprovedAndOnline(court.getAuditStatus(), court.getStatus())) {
+      throw new BizException("知识重建仅允许已审核且已上架的场馆和场地");
+    }
     Venue venue = venueService.getById(court.getVenueId());
     if (venue == null) {
       throw new BizException("场馆不存在");
+    }
+    if (!isApprovedAndOnline(venue.getAuditStatus(), venue.getStatus())) {
+      throw new BizException("知识重建仅允许已审核且已上架的场馆和场地");
     }
     KnowledgeSource source =
         new KnowledgeSource(
@@ -48,6 +54,10 @@ public class KnowledgeController {
             "预约后锁定 15 分钟，未确认会自动释放；具体规则以平台页面为准",
             latestTime(venue.getCreateTime(), court.getCreateTime()));
     return Result.ok(rebuildService.rebuild(source));
+  }
+
+  private boolean isApprovedAndOnline(Integer auditStatus, Integer status) {
+    return Integer.valueOf(1).equals(auditStatus) && Integer.valueOf(1).equals(status);
   }
 
   private String facilitiesFor(Court court) {

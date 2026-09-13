@@ -6,6 +6,8 @@ import com.example.booking.domain.dto.MerchantCourtRequest;
 import com.example.booking.domain.dto.MerchantVenueRequest;
 import com.example.booking.domain.entity.Court;
 import com.example.booking.domain.entity.Venue;
+import com.example.booking.domain.vo.MerchantCourtVO;
+import com.example.booking.domain.vo.MerchantVenueVO;
 import com.example.booking.service.CourtService;
 import com.example.booking.service.SlotService;
 import com.example.booking.service.VenueService;
@@ -37,19 +39,19 @@ public class MerchantController {
   private final SlotService slotService;
 
   @GetMapping("/venues")
-  public Result<List<Venue>> myVenues() {
-    return Result.ok(venueService.listMine());
+  public Result<List<MerchantVenueVO>> myVenues() {
+    return Result.ok(venueService.listMine().stream().map(MerchantVenueVO::from).toList());
   }
 
   @PostMapping("/venues")
-  public Result<Venue> createVenue(@Valid @RequestBody MerchantVenueRequest request) {
-    return Result.ok(venueService.create(request));
+  public Result<MerchantVenueVO> createVenue(@Valid @RequestBody MerchantVenueRequest request) {
+    return Result.ok(MerchantVenueVO.from(venueService.create(request)));
   }
 
   @PutMapping("/venues/{id}")
-  public Result<Venue> updateVenue(
+  public Result<MerchantVenueVO> updateVenue(
       @PathVariable("id") Long venueId, @Valid @RequestBody MerchantVenueRequest request) {
-    return Result.ok(venueService.update(venueId, request));
+    return Result.ok(MerchantVenueVO.from(venueService.update(venueId, request)));
   }
 
   @PostMapping("/venues/{id}/offline")
@@ -59,19 +61,19 @@ public class MerchantController {
   }
 
   @GetMapping("/courts")
-  public Result<List<Court>> myCourts() {
-    return Result.ok(courtService.listMine());
+  public Result<List<MerchantCourtVO>> myCourts() {
+    return Result.ok(courtService.listMine().stream().map(MerchantCourtVO::from).toList());
   }
 
   @PostMapping("/courts")
-  public Result<Court> createCourt(@Valid @RequestBody MerchantCourtRequest request) {
-    return Result.ok(courtService.create(request));
+  public Result<MerchantCourtVO> createCourt(@Valid @RequestBody MerchantCourtRequest request) {
+    return Result.ok(MerchantCourtVO.from(courtService.create(request)));
   }
 
   @PutMapping("/courts/{id}")
-  public Result<Court> updateCourt(
+  public Result<MerchantCourtVO> updateCourt(
       @PathVariable("id") Long courtId, @Valid @RequestBody MerchantCourtRequest request) {
-    return Result.ok(courtService.update(courtId, request));
+    return Result.ok(MerchantCourtVO.from(courtService.update(courtId, request)));
   }
 
   @PostMapping("/courts/{id}/offline")
