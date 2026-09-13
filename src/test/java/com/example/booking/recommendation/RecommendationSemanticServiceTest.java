@@ -12,6 +12,11 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -21,6 +26,8 @@ class RecommendationSemanticServiceTest {
 
   private VectorStore vectorStore;
   private ObjectProvider<VectorStore> vectorStoreProvider;
+  private ChatModel chatModel;
+  private ObjectProvider<ChatModel> chatModelProvider;
   private RecommendationSemanticService service;
 
   @BeforeEach
@@ -28,6 +35,9 @@ class RecommendationSemanticServiceTest {
     vectorStore = mock(VectorStore.class);
     vectorStoreProvider = mock(ObjectProvider.class);
     when(vectorStoreProvider.getIfAvailable()).thenReturn(vectorStore);
+    chatModel = mock(ChatModel.class);
+    chatModelProvider = mock(ObjectProvider.class);
+    when(chatModelProvider.getIfAvailable()).thenReturn(chatModel);
     service = new RecommendationSemanticService(vectorStoreProvider, true, false);
   }
 
@@ -45,7 +55,7 @@ class RecommendationSemanticServiceTest {
         service.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
 
     assertThat(result.reasonFor(1L))
-        .hasValueSatisfying(reason -> assertThat(reason).contains("公开场地资料"));
+        .hasValueSatisfying(reason -> assertThat(reason).contains("安静区、淋浴、更衣室"));
     ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
     org.mockito.Mockito.verify(vectorStore).similaritySearch(captor.capture());
     assertThat(captor.getValue().getQuery()).isEqualTo("想要安静一些");
@@ -108,6 +118,71 @@ class RecommendationSemanticServiceTest {
 
     assertThat(result.isEmpty()).isTrue();
     org.mockito.Mockito.verifyNoInteractions(vectorStore);
+  }
+
+  @Test
+  void enhance_聊天开启时将候选摘要和文档内容交给ChatModel并解析理由标签() {
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(
+            List.of(
+                new Document(
+                    "doc-1",
+                    "安静区、淋浴、更衣室",
+                    Map.of("courtId", "101", "status", "1", "documentType", "court_profile"))));
+    when(chatModel.call(any(Prompt.class)))
+        .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("1|模型理由|QUIET")))));
+    RecommendationSemanticService chatService =
+        new RecommendationSemanticService(vectorStoreProvider, chatModelProvider, true, true);
+
+    RecommendationEnhancement result =
+        chatService.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.reasonFor(1L)).hasValue("模型理由");
+    assertThat(result.tagsFor(1L)).containsExactly(RecommendationTag.QUIET);
+    ArgumentCaptor<Prompt> captor = ArgumentCaptor.forClass(Prompt.class);
+    org.mockito.Mockito.verify(chatModel).call(captor.capture());
+    assertThat(captor.getValue().getContents())
+        .contains("slotId=1", "安静区、淋浴、更衣室", "想要安静一些");
+  }
+
+  @Test
+  void enhance_向量关闭但聊天开启时仍尝试ChatModel() {
+    when(chatModel.call(any(Prompt.class)))
+        .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("1|仅聊天理由")))));
+    RecommendationSemanticService chatService =
+        new RecommendationSemanticService(vectorStoreProvider, chatModelProvider, false, true);
+
+    RecommendationEnhancement result =
+        chatService.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.reasonFor(1L)).hasValue("仅聊天理由");
+    org.mockito.Mockito.verify(chatModel).call(any(Prompt.class));
+    org.mockito.Mockito.verifyNoInteractions(vectorStore);
+  }
+
+  @Test
+  void enhance_聊天开启但组件不可用时安全返回空增强() {
+    when(chatModelProvider.getIfAvailable()).thenReturn(null);
+    RecommendationSemanticService chatService =
+        new RecommendationSemanticService(vectorStoreProvider, chatModelProvider, false, true);
+
+    RecommendationEnhancement result =
+        chatService.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.isEmpty()).isTrue();
+    org.mockito.Mockito.verifyNoInteractions(vectorStore);
+  }
+
+  @Test
+  void enhance_聊天响应为空时安全返回空增强() {
+    when(chatModel.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of()));
+    RecommendationSemanticService chatService =
+        new RecommendationSemanticService(vectorStoreProvider, chatModelProvider, false, true);
+
+    RecommendationEnhancement result =
+        chatService.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.isEmpty()).isTrue();
   }
 
   private SlotRecommendationItem candidate(Long slotId) {
