@@ -36,6 +36,13 @@ class AuthInterceptorTest {
   }
 
   @Test
+  void 顾客访问精确管理员根路径返回4030() {
+    assertThatThrownBy(() -> invoke("/admin", 0))
+        .isInstanceOf(BizException.class)
+        .hasFieldOrPropertyWithValue("code", 4030);
+  }
+
+  @Test
   void 商家访问管理员接口返回4030() {
     assertThatThrownBy(() -> invoke("/admin/reviews", 1))
         .isInstanceOf(BizException.class)
@@ -47,6 +54,22 @@ class AuthInterceptorTest {
     assertThatThrownBy(() -> invoke("/merchant/venues", 2))
         .isInstanceOf(BizException.class)
         .hasFieldOrPropertyWithValue("code", 4030);
+  }
+
+  @Test
+  void 管理员访问精确商家根路径返回4030() {
+    assertThatThrownBy(() -> invoke("/merchant", 2))
+        .isInstanceOf(BizException.class)
+        .hasFieldOrPropertyWithValue("code", 4030);
+  }
+
+  @Test
+  void 无Token访问受保护路径返回4010() {
+    HttpServletRequest request = requestWithoutToken("/admin");
+
+    assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+        .isInstanceOf(BizException.class)
+        .hasFieldOrPropertyWithValue("code", 4010);
   }
 
   @Test
@@ -88,6 +111,13 @@ class AuthInterceptorTest {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getMethod()).thenReturn("GET");
     when(request.getHeader("Authorization")).thenReturn("Bearer token");
+    when(request.getServletPath()).thenReturn(path);
+    return request;
+  }
+
+  private HttpServletRequest requestWithoutToken(String path) {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getMethod()).thenReturn("GET");
     when(request.getServletPath()).thenReturn(path);
     return request;
   }

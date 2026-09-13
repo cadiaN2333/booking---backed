@@ -32,7 +32,7 @@ class DataInitializerTest {
   }
 
   @Test
-  void 初始化时创建管理员并使用本地演示默认密码() {
+  void 初始化时注入自定义管理员密码并传给PasswordEncoder() {
     UserMapper userMapper = mock(UserMapper.class);
     VenueMapper venueMapper = mock(VenueMapper.class);
     SlotMapper slotMapper = mock(SlotMapper.class);
@@ -41,13 +41,14 @@ class DataInitializerTest {
     when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
     when(venueMapper.selectList(any())).thenReturn(List.of());
     when(slotMapper.selectCount(null)).thenReturn(1L);
-    when(passwordEncoder.encode("Admin@123456")).thenReturn("encoded-admin");
+    String customAdminPassword = "EnvSecret@2026";
+    when(passwordEncoder.encode(customAdminPassword)).thenReturn("encoded-admin");
     when(passwordEncoder.encode("123456")).thenReturn("encoded-demo");
 
     DataInitializer initializer =
         new DataInitializer(
             userMapper, venueMapper, slotMapper, slotService, passwordEncoder);
-    ReflectionTestUtils.setField(initializer, "adminPassword", "Admin@123456");
+    ReflectionTestUtils.setField(initializer, "adminPassword", customAdminPassword);
     initializer.run(new DefaultApplicationArguments());
 
     ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
@@ -59,5 +60,6 @@ class DataInitializerTest {
             .orElseThrow();
     assertThat(admin.getRole()).isEqualTo(2);
     assertThat(admin.getPassword()).isEqualTo("encoded-admin");
+    verify(passwordEncoder).encode(customAdminPassword);
   }
 }

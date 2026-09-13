@@ -7,12 +7,10 @@ import org.junit.jupiter.api.Test;
 class UserRoleEnumTest {
 
   @Test
-  void 角色2是管理员() {
-    assertThat(UserRoleEnum.values())
-        .anySatisfy(role -> {
-          assertThat(role.getCode()).isEqualTo(2);
-          assertThat(role.name()).isEqualTo("ADMIN");
-        });
+  void 三种角色编码固定为顾客0商家1管理员2() {
+    assertThat(UserRoleEnum.CUSTOMER.getCode()).isEqualTo(0);
+    assertThat(UserRoleEnum.MERCHANT.getCode()).isEqualTo(1);
+    assertThat(UserRoleEnum.ADMIN.getCode()).isEqualTo(2);
     assertThat(UserRoleEnum.isAdmin(2)).isTrue();
   }
 
