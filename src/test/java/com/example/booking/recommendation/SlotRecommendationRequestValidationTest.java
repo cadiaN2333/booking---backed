@@ -47,6 +47,8 @@ class SlotRecommendationRequestValidationTest {
 
   @MockBean private SlotService slotService;
 
+  @MockBean private RecommendationSemanticService semanticService;
+
   @MockBean private TokenService tokenService;
 
   @MockBean private UserMapper userMapper;

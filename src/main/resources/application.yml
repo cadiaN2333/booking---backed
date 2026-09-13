@@ -36,6 +36,11 @@ booking:
   lock-minutes: 15
   # 时段默认生成天数
   generate-days: 14
+  recommendation:
+    # 语义推荐默认关闭；开启前需准备可用的公开场地向量文档。
+    vector-enabled: ${BOOKING_RECOMMENDATION_VECTOR_ENABLED:false}
+    # 当前依赖未提供 ChatClient 配置，保持关闭即可安全使用规则推荐。
+    chat-enabled: ${BOOKING_RECOMMENDATION_CHAT_ENABLED:false}
   vector:
     # 阶段三默认关闭；开启前先启动 pgvector 并配置 OPENAI_API_KEY
     enabled: ${BOOKING_VECTOR_ENABLED:false}

@@ -19,12 +19,14 @@ class SlotRecommendationServiceTest {
   private static final LocalDate DATE = LocalDate.of(2026, 9, 13);
 
   private SlotService slotService;
+  private RecommendationSemanticService semanticService;
   private SlotRecommendationService service;
 
   @BeforeEach
   void setUp() {
     slotService = mock(SlotService.class);
-    service = new SlotRecommendationService(slotService);
+    semanticService = mock(RecommendationSemanticService.class);
+    service = new SlotRecommendationService(slotService, semanticService);
   }
 
   @Test
@@ -192,6 +194,71 @@ class SlotRecommendationServiceTest {
         .containsExactly(1L, 2L);
     assertThat(result.recommendations().get(0).score())
         .isEqualTo((long) Integer.MAX_VALUE + 1000L);
+  }
+
+  @Test
+  void recommend_语义服务成功时只增强已排序候选且不改变硬字段() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(List.of(slot(1L, 101L, DATE, "18:00", 2)));
+    when(
+            semanticService.enhance(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(101L),
+                org.mockito.ArgumentMatchers.isNull()))
+        .thenReturn(
+            new RecommendationEnhancement(
+                java.util.Map.of(1L, "结合公开场地资料推荐"), java.util.Map.of()));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(), 1));
+
+    assertThat(result.degraded()).isFalse();
+    assertThat(result.recommendations().get(0))
+        .extracting(SlotRecommendationItem::slotId, SlotRecommendationItem::courtId,
+            SlotRecommendationItem::startAt, SlotRecommendationItem::endAt,
+            SlotRecommendationItem::price, SlotRecommendationItem::available)
+        .containsExactly(1L, 101L, LocalDateTime.of(DATE, java.time.LocalTime.of(18, 0)),
+            LocalDateTime.of(DATE, java.time.LocalTime.of(19, 0)), 8000, 2);
+    assertThat(result.recommendations().get(0).reason()).isEqualTo("结合公开场地资料推荐");
+  }
+
+  @Test
+  void recommend_语义服务返回未知时段时丢弃未知ID并保留规则结果() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(List.of(slot(1L, 101L, DATE, "18:00", 2)));
+    when(
+            semanticService.enhance(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(101L),
+                org.mockito.ArgumentMatchers.isNull()))
+        .thenReturn(
+            new RecommendationEnhancement(java.util.Map.of(999L, "伪造理由"), java.util.Map.of()));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(), 1));
+
+    assertThat(result.degraded()).isTrue();
+    assertThat(result.recommendations()).extracting(SlotRecommendationItem::slotId).containsExactly(1L);
+    assertThat(result.recommendations().get(0).reason()).isEqualTo("按时间与可约余量为你排序");
+  }
+
+  @Test
+  void recommend_语义服务异常时保留规则候选并标记降级() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(List.of(slot(1L, 101L, DATE, "18:00", 2)));
+    when(
+            semanticService.enhance(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(101L),
+                org.mockito.ArgumentMatchers.isNull()))
+        .thenThrow(new IllegalStateException("vector down"));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(), 1));
+
+    assertThat(result.degraded()).isTrue();
+    assertThat(result.recommendations()).extracting(SlotRecommendationItem::slotId).containsExactly(1L);
+    assertThat(result.recommendations().get(0).reason()).isEqualTo("按时间与可约余量为你排序");
   }
 
   private SlotRecommendationItem itemById(SlotRecommendationResponse response, Long slotId) {

@@ -8,12 +8,13 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /** 基于当前场地当前日期时段快照的只读规则推荐服务。 */
 @Service
-@RequiredArgsConstructor
 public class SlotRecommendationService {
 
   private static final String DEFAULT_REASON = "按时间与可约余量为你排序";
@@ -22,6 +23,18 @@ public class SlotRecommendationService {
   private static final LocalTime EVENING_END = LocalTime.of(22, 0);
 
   private final SlotService slotService;
+  private final RecommendationSemanticService semanticService;
+
+  @Autowired
+  public SlotRecommendationService(
+      SlotService slotService, RecommendationSemanticService semanticService) {
+    this.slotService = slotService;
+    this.semanticService = semanticService;
+  }
+
+  public SlotRecommendationService(SlotService slotService) {
+    this(slotService, RecommendationSemanticService.disabled());
+  }
 
   public SlotRecommendationResponse recommend(SlotRecommendationRequest request) {
     Set<RecommendationTag> tags = request.resolvedTags();
@@ -35,7 +48,7 @@ public class SlotRecommendationService {
             .min(Comparator.comparing(SlotVO::getStartAt).thenComparing(SlotVO::getId))
             .orElse(null);
     int maxAvailable = candidates.stream().mapToInt(SlotVO::getAvailable).max().orElse(0);
-    List<SlotRecommendationItem> recommendations =
+    List<SlotRecommendationItem> rankedRecommendations =
         candidates.stream()
             .map(slot -> toItem(slot, tags, earliest, maxAvailable))
             .sorted(
@@ -43,9 +56,52 @@ public class SlotRecommendationService {
                     .reversed()
                     .thenComparing(SlotRecommendationItem::startAt)
                     .thenComparing(SlotRecommendationItem::slotId))
-            .limit(request.resolvedLimit())
             .toList();
-    return new SlotRecommendationResponse(recommendations, true);
+    List<SlotRecommendationItem> recommendations =
+        rankedRecommendations.stream().limit(request.resolvedLimit()).toList();
+    return enhance(recommendations, request);
+  }
+
+  private SlotRecommendationResponse enhance(
+      List<SlotRecommendationItem> recommendations, SlotRecommendationRequest request) {
+    if (recommendations.isEmpty()) {
+      return new SlotRecommendationResponse(recommendations, true);
+    }
+    try {
+      RecommendationEnhancement enhancement =
+          semanticService.enhance(recommendations, request.courtId(), request.query());
+      if (enhancement == null) {
+        return new SlotRecommendationResponse(recommendations, true);
+      }
+      RecommendationEnhancement allowedEnhancement =
+          enhancement.onlyFor(
+              recommendations.stream().map(SlotRecommendationItem::slotId).toList());
+      if (allowedEnhancement.isEmpty()) {
+        return new SlotRecommendationResponse(recommendations, true);
+      }
+      List<SlotRecommendationItem> enhancedRecommendations =
+          recommendations.stream().map(item -> applyEnhancement(item, allowedEnhancement)).toList();
+      return new SlotRecommendationResponse(enhancedRecommendations, false);
+    } catch (RuntimeException ignored) {
+      return new SlotRecommendationResponse(recommendations, true);
+    }
+  }
+
+  private SlotRecommendationItem applyEnhancement(
+      SlotRecommendationItem item, RecommendationEnhancement enhancement) {
+    Set<RecommendationTag> mergedTags =
+        Stream.concat(item.tags().stream(), enhancement.tagsFor(item.slotId()).stream())
+            .collect(Collectors.toUnmodifiableSet());
+    return new SlotRecommendationItem(
+        item.slotId(),
+        item.courtId(),
+        item.startAt(),
+        item.endAt(),
+        item.price(),
+        item.available(),
+        item.score(),
+        mergedTags,
+        enhancement.reasonFor(item.slotId()).orElse(item.reason()));
   }
 
   private boolean belongsToRequest(SlotVO slot, SlotRecommendationRequest request) {
