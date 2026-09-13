@@ -24,7 +24,7 @@ public class User implements Serializable {
   private String nickname;
   private String phone;
 
-  /** 0 顾客 1 商家 */
+  /** 0 顾客 1 商家 2 管理员 */
   private Integer role;
 
   /** 1 正常 0 禁用 */

@@ -19,6 +19,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
   private static final String BEARER = "Bearer ";
   private static final String MERCHANT_PREFIX = "/merchant";
+  private static final String ADMIN_PREFIX = "/admin";
 
   private final TokenService tokenService;
   private final UserMapper userMapper;
@@ -45,8 +46,13 @@ public class AuthInterceptor implements HandlerInterceptor {
       throw new BizException(4012, "账号不可用");
     }
 
-    // 商家端接口做角色校验：顾客访问一律 403
+    // 管理员端接口只允许管理员访问，普通用户访问一律 403
     String path = request.getServletPath();
+    if (path.startsWith(ADMIN_PREFIX) && !UserRoleEnum.isAdmin(user.getRole())) {
+      throw new BizException(4030, "无管理员权限");
+    }
+
+    // 商家端接口只允许商家访问，管理员也不能代替商家操作
     if (path.startsWith(MERCHANT_PREFIX) && !UserRoleEnum.isMerchant(user.getRole())) {
       throw new BizException(4030, "无商家权限");
     }

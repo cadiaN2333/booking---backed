@@ -24,6 +24,6 @@ public class RegisterRequest implements Serializable {
 
   private String phone;
 
-  /** 0 顾客 1 商家。真实项目里商家入驻应走审核流程，这里为方便演示可直接选 */
+  /** 0 顾客 1 商家；管理员由初始化器创建，不开放普通注册 */
   private Integer role = 0;
 }

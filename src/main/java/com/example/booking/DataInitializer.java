@@ -17,7 +17,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-/** 首次启动准备演示数据：两个账号 + 把所有场馆挂到演示商家名下 + 铺时段 */
+/** 首次启动准备演示数据：三个账号 + 把所有场馆挂到演示商家名下 + 铺时段 */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -25,6 +25,9 @@ public class DataInitializer implements ApplicationRunner {
 
   /** 演示账号密码。仅用于本地演示，真实环境不要预置账号 */
   private static final String DEMO_PASSWORD = "123456";
+
+  /** 管理员默认密码仅用于本地演示，部署环境应通过 BOOKING_ADMIN_PASSWORD 覆盖 */
+  private static final String ADMIN_DEFAULT_PASSWORD = "Admin@123456";
 
   private final UserMapper userMapper;
   private final VenueMapper venueMapper;
@@ -35,10 +38,14 @@ public class DataInitializer implements ApplicationRunner {
   @Value("${booking.generate-days:14}")
   private int generateDays;
 
+  @Value("${BOOKING_ADMIN_PASSWORD:Admin@123456}")
+  private String adminPassword = ADMIN_DEFAULT_PASSWORD;
+
   @Override
   public void run(ApplicationArguments args) {
     User merchant = ensureUser("merchant", "星辰体育（演示商家）", UserRoleEnum.MERCHANT.getCode());
     ensureUser("customer", "体验用户", UserRoleEnum.CUSTOMER.getCode());
+    ensureUser("admin", "平台管理员", UserRoleEnum.ADMIN.getCode(), adminPassword);
     bindVenuesToMerchant(merchant.getId());
 
     if (slotMapper.selectCount(null) == 0) {
@@ -48,6 +55,10 @@ public class DataInitializer implements ApplicationRunner {
   }
 
   private User ensureUser(String username, String nickname, int role) {
+    return ensureUser(username, nickname, role, DEMO_PASSWORD);
+  }
+
+  private User ensureUser(String username, String nickname, int role, String password) {
     User exists =
         userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
     if (exists != null) {
@@ -55,12 +66,12 @@ public class DataInitializer implements ApplicationRunner {
     }
     User u = new User();
     u.setUsername(username);
-    u.setPassword(passwordEncoder.encode(DEMO_PASSWORD));
+    u.setPassword(passwordEncoder.encode(password));
     u.setNickname(nickname);
     u.setRole(role);
     u.setStatus(1);
     userMapper.insert(u);
-    log.info("已创建演示账号 {} / {} (role={})", username, DEMO_PASSWORD, role);
+    log.info("已创建演示账号 {} (role={})", username, role);
     return u;
   }
 

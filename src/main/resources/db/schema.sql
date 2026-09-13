@@ -2,14 +2,14 @@
 CREATE DATABASE IF NOT EXISTS `booking` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE `booking`;
 
--- 用户：role 0=顾客 1=商家
+-- 用户：role 0=顾客 1=商家 2=管理员
 CREATE TABLE IF NOT EXISTS `user` (
   `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `username`    VARCHAR(32)  NOT NULL COMMENT '登录名',
   `password`    VARCHAR(100) NOT NULL COMMENT 'BCrypt 密文',
   `nickname`    VARCHAR(32)  NOT NULL,
   `phone`       VARCHAR(20)  DEFAULT NULL,
-  `role`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0顾客 1商家',
+  `role`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0顾客 1商家 2管理员',
   `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '1正常 0禁用',
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -23,7 +23,11 @@ CREATE TABLE IF NOT EXISTS `venue` (
   `name`        VARCHAR(64)  NOT NULL,
   `address`     VARCHAR(255) DEFAULT NULL,
   `merchant_id` BIGINT UNSIGNED DEFAULT NULL COMMENT '归属商家 user.id',
-  `status`      TINYINT      NOT NULL DEFAULT 1,
+  `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '1已上架 0下架',
+  `audit_status` TINYINT     NOT NULL DEFAULT 0 COMMENT '0待审核 1审核通过 2已驳回',
+  `audit_remark` VARCHAR(500) DEFAULT NULL COMMENT '审核备注或驳回原因',
+  `audit_time` DATETIME     DEFAULT NULL COMMENT '审核时间',
+  `audit_by` BIGINT UNSIGNED DEFAULT NULL COMMENT '审核人 user.id',
   `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_merchant` (`merchant_id`)
@@ -39,7 +43,11 @@ CREATE TABLE IF NOT EXISTS `court` (
   `open_time`    TIME         NOT NULL,
   `close_time`   TIME         NOT NULL,
   `slot_minutes` INT          NOT NULL DEFAULT 60 COMMENT '单时段时长(分钟)',
-  `status`       TINYINT      NOT NULL DEFAULT 1,
+  `status`       TINYINT      NOT NULL DEFAULT 1 COMMENT '1已上架 0下架',
+  `audit_status` TINYINT      NOT NULL DEFAULT 0 COMMENT '0待审核 1审核通过 2已驳回',
+  `audit_remark` VARCHAR(500) DEFAULT NULL COMMENT '审核备注或驳回原因',
+  `audit_time` DATETIME       DEFAULT NULL COMMENT '审核时间',
+  `audit_by` BIGINT UNSIGNED  DEFAULT NULL COMMENT '审核人 user.id',
   `create_time`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_venue` (`venue_id`)

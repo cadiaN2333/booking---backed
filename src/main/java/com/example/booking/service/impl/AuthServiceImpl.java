@@ -37,7 +37,13 @@ public class AuthServiceImpl implements AuthService {
       throw new BizException("用户名已被占用");
     }
 
-    // 允许直接选商家仅为演示方便；真实项目商家入驻应走资质审核 + 线下签约
+    // 普通注册只允许顾客或商家，管理员账号由初始化器创建
+    if (req.getRole() != null
+        && !UserRoleEnum.isMerchant(req.getRole())
+        && req.getRole() != UserRoleEnum.CUSTOMER.getCode()) {
+      throw new BizException("注册角色不合法");
+    }
+
     int role = UserRoleEnum.isMerchant(req.getRole())
         ? UserRoleEnum.MERCHANT.getCode()
         : UserRoleEnum.CUSTOMER.getCode();

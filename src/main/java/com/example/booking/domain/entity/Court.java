@@ -30,6 +30,20 @@ public class Court implements Serializable {
   /** 单时段时长（分钟） */
   private Integer slotMinutes;
 
-  private Integer status;
+  /** 1已上架 0下架；新建资源默认下架 */
+  private Integer status = 0;
+
+  /** 0待审核 1审核通过 2已驳回 */
+  private Integer auditStatus = 0;
+
+  /** 审核驳回原因 */
+  private String auditRemark;
+
+  /** 审核时间 */
+  private LocalDateTime auditTime;
+
+  /** 审核人 user.id */
+  private Long auditBy;
+
   private LocalDateTime createTime;
 }
