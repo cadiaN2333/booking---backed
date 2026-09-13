@@ -225,7 +225,10 @@ public class SlotServiceImpl implements SlotService {
   @Transactional(rollbackFor = Exception.class)
   public int generateAll(int days) {
     int sum = 0;
-    for (Court court : courtMapper.selectList(new LambdaQueryWrapper<Court>().eq(Court::getStatus, 1))) {
+    for (Court court : courtMapper.selectList(
+        new LambdaQueryWrapper<Court>()
+            .eq(Court::getAuditStatus, 1)
+            .eq(Court::getStatus, 1))) {
       sum += generate(court.getId(), days);
     }
     return sum;

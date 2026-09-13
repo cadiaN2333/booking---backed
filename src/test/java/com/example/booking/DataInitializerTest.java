@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.example.booking.domain.entity.User;
-import com.example.booking.mapper.SlotMapper;
 import com.example.booking.mapper.UserMapper;
 import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.SlotService;
@@ -35,19 +34,17 @@ class DataInitializerTest {
   void 初始化时注入自定义管理员密码并传给PasswordEncoder() {
     UserMapper userMapper = mock(UserMapper.class);
     VenueMapper venueMapper = mock(VenueMapper.class);
-    SlotMapper slotMapper = mock(SlotMapper.class);
     SlotService slotService = mock(SlotService.class);
     PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
     when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
     when(venueMapper.selectList(any())).thenReturn(List.of());
-    when(slotMapper.selectCount(null)).thenReturn(1L);
     String customAdminPassword = "EnvSecret@2026";
     when(passwordEncoder.encode(customAdminPassword)).thenReturn("encoded-admin");
     when(passwordEncoder.encode("123456")).thenReturn("encoded-demo");
 
     DataInitializer initializer =
         new DataInitializer(
-            userMapper, venueMapper, slotMapper, slotService, passwordEncoder);
+            userMapper, venueMapper, slotService, passwordEncoder);
     ReflectionTestUtils.setField(initializer, "adminPassword", customAdminPassword);
     initializer.run(new DefaultApplicationArguments());
 
@@ -61,5 +58,23 @@ class DataInitializerTest {
     assertThat(admin.getRole()).isEqualTo(2);
     assertThat(admin.getPassword()).isEqualTo("encoded-admin");
     verify(passwordEncoder).encode(customAdminPassword);
+  }
+
+  @Test
+  void 初始化每次调用全量时段生成以补齐部分已有数据() {
+    UserMapper userMapper = mock(UserMapper.class);
+    VenueMapper venueMapper = mock(VenueMapper.class);
+    SlotService slotService = mock(SlotService.class);
+    PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+    when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+    when(venueMapper.selectList(any())).thenReturn(List.of());
+
+    DataInitializer initializer =
+        new DataInitializer(userMapper, venueMapper, slotService, passwordEncoder);
+    ReflectionTestUtils.setField(initializer, "generateDays", 7);
+
+    initializer.run(new DefaultApplicationArguments());
+
+    verify(slotService).generateAll(7);
   }
 }

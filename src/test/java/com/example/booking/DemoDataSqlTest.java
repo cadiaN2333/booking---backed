@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DemoDataSqlTest {
@@ -24,6 +25,12 @@ class DemoDataSqlTest {
 
     String values = statement.substring(statement.indexOf("VALUES") + "VALUES".length(),
         statement.indexOf("ON DUPLICATE KEY UPDATE"));
+    List<String> expectedIds = "venue".equals(tableName)
+        ? List.of("1", "2", "3")
+        : List.of("101", "102", "103", "201", "202", "301");
+    for (String id : expectedIds) {
+      assertThat(values).containsPattern("(?m)^\\s*\\(" + id + ",");
+    }
     for (String line : values.split("\\R")) {
       if (!line.trim().startsWith("(")) {
         continue;
@@ -34,8 +41,12 @@ class DemoDataSqlTest {
     }
 
     assertThat(statement)
-        .contains("`status` = VALUES(`status`)")
-        .contains("`audit_status` = VALUES(`audit_status`)");
+        .contains("`name` = VALUES(`name`)");
+    String duplicateUpdate = statement.substring(statement.indexOf("ON DUPLICATE KEY UPDATE"));
+    assertThat(duplicateUpdate)
+        .doesNotContain("`status`")
+        .doesNotContain("`audit_status`")
+        .doesNotContain("`merchant_id`");
   }
 
   private String statementFor(String sql, String tableName) {

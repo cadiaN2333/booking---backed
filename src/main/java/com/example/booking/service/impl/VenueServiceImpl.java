@@ -18,7 +18,10 @@ public class VenueServiceImpl implements VenueService {
   @Override
   public List<Venue> listOnline() {
     return venueMapper.selectList(
-        new LambdaQueryWrapper<Venue>().eq(Venue::getStatus, 1).orderByAsc(Venue::getId));
+        new LambdaQueryWrapper<Venue>()
+            .eq(Venue::getAuditStatus, 1)
+            .eq(Venue::getStatus, 1)
+            .orderByAsc(Venue::getId));
   }
 
   @Override

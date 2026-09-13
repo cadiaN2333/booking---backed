@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.booking.domain.entity.User;
 import com.example.booking.domain.entity.Venue;
 import com.example.booking.domain.enums.UserRoleEnum;
-import com.example.booking.mapper.SlotMapper;
 import com.example.booking.mapper.UserMapper;
 import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.SlotService;
@@ -31,7 +30,6 @@ public class DataInitializer implements ApplicationRunner {
 
   private final UserMapper userMapper;
   private final VenueMapper venueMapper;
-  private final SlotMapper slotMapper;
   private final SlotService slotService;
   private final PasswordEncoder passwordEncoder;
 
@@ -48,10 +46,8 @@ public class DataInitializer implements ApplicationRunner {
     ensureUser("admin", "平台管理员", UserRoleEnum.ADMIN.getCode(), adminPassword);
     bindVenuesToMerchant(merchant.getId());
 
-    if (slotMapper.selectCount(null) == 0) {
-      int n = slotService.generateAll(generateDays);
-      log.info("首次启动，已生成 {} 个时段", n);
-    }
+    int n = slotService.generateAll(generateDays);
+    log.info("启动时幂等补齐时段 {} 个", n);
   }
 
   private User ensureUser(String username, String nickname, int role) {
