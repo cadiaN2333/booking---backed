@@ -171,6 +171,20 @@ class MerchantResourceServiceTest {
   }
 
   @Test
+  void 编辑场地拒绝修改所属场馆() {
+    Court existing = court(COURT_ID, VENUE_ID, 1, 1);
+    when(courtMapper.selectById(COURT_ID)).thenReturn(existing);
+    when(venueMapper.selectById(VENUE_ID)).thenReturn(venue(VENUE_ID, MERCHANT_ID, 1, 1));
+
+    assertThatThrownBy(() -> courtService.update(COURT_ID, courtRequest(202L)))
+        .isInstanceOf(BizException.class)
+        .hasFieldOrPropertyWithValue("code", 4001)
+        .hasMessage("编辑场地时不能修改所属场馆");
+    verify(venueMapper, never()).selectById(202L);
+    verify(courtMapper, never()).updateById(any(Court.class));
+  }
+
+  @Test
   void 场地下架保留审核记录() {
     Court existing = court(COURT_ID, VENUE_ID, 1, 1);
     existing.setAuditRemark("审核通过");
