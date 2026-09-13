@@ -11,6 +11,6 @@ public record SlotRecommendationItem(
     LocalDateTime endAt,
     Integer price,
     Integer available,
-    int score,
+    long score,
     Set<RecommendationTag> tags,
     String reason) {}

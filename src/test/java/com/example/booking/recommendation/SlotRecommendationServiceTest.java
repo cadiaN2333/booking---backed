@@ -107,10 +107,98 @@ class SlotRecommendationServiceTest {
         .allSatisfy(
             item -> {
               assertThat(item.reason()).isEqualTo("按时间与可约余量为你排序");
-              assertThat(item.tags()).containsExactly(RecommendationTag.QUIET);
+              assertThat(item.tags()).isEmpty();
             });
     assertThat(quiet.recommendations()).extracting(SlotRecommendationItem::score)
         .containsExactlyElementsOf(noTag.recommendations().stream().map(SlotRecommendationItem::score).toList());
+  }
+
+  @Test
+  void recommend_傍晚标签只标记傍晚候选() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, DATE, "10:00", 2),
+                slot(2L, 101L, DATE, "18:00", 2)));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(RecommendationTag.EVENING), 2));
+
+    assertThat(itemById(result, 1L).tags()).doesNotContain(RecommendationTag.EVENING);
+    assertThat(itemById(result, 2L).tags()).containsExactly(RecommendationTag.EVENING);
+  }
+
+  @Test
+  void recommend_容量标签只标记余量最高候选() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, DATE, "09:00", 1),
+                slot(2L, 101L, DATE, "10:00", 3),
+                slot(3L, 101L, DATE, "11:00", 2)));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(RecommendationTag.CAPACITY), 3));
+
+    assertThat(itemById(result, 1L).tags()).doesNotContain(RecommendationTag.CAPACITY);
+    assertThat(itemById(result, 2L).tags()).containsExactly(RecommendationTag.CAPACITY);
+    assertThat(itemById(result, 3L).tags()).doesNotContain(RecommendationTag.CAPACITY);
+  }
+
+  @Test
+  void recommend_尽早标签只标记最早候选() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, DATE, "09:00", 2),
+                slot(2L, 101L, DATE, "10:00", 2)));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(RecommendationTag.EARLIEST), 2));
+
+    assertThat(itemById(result, 1L).tags()).containsExactly(RecommendationTag.EARLIEST);
+    assertThat(itemById(result, 2L).tags()).doesNotContain(RecommendationTag.EARLIEST);
+  }
+
+  @Test
+  void recommend_降级模式不返回安静标签() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(List.of(slot(1L, 101L, DATE, "09:00", 2)));
+
+    SlotRecommendationResponse result =
+        service.recommend(request(101L, DATE, Set.of(RecommendationTag.QUIET), 1));
+
+    assertThat(result.degraded()).isTrue();
+    assertThat(itemById(result, 1L).tags()).doesNotContain(RecommendationTag.QUIET);
+  }
+
+  @Test
+  void recommend_超大余量评分不溢出且容量排序正确() {
+    when(slotService.listByCourtAndDate(101L, DATE))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, DATE, "18:00", Integer.MAX_VALUE),
+                slot(2L, 101L, DATE, "19:00", 1)));
+
+    SlotRecommendationResponse result =
+        service.recommend(
+            request(
+                101L,
+                DATE,
+                Set.of(RecommendationTag.EVENING, RecommendationTag.CAPACITY),
+                2));
+
+    assertThat(result.recommendations()).extracting(SlotRecommendationItem::slotId)
+        .containsExactly(1L, 2L);
+    assertThat(result.recommendations().get(0).score())
+        .isEqualTo((long) Integer.MAX_VALUE + 1000L);
+  }
+
+  private SlotRecommendationItem itemById(SlotRecommendationResponse response, Long slotId) {
+    return response.recommendations().stream()
+        .filter(item -> item.slotId().equals(slotId))
+        .findFirst()
+        .orElseThrow();
   }
 
   private SlotRecommendationRequest request(

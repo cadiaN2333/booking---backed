@@ -25,6 +25,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
             "/venues",
             "/courts",
             "/courts/*/slots",
+            "/recommendations/slots",
             "/error");
   }
 

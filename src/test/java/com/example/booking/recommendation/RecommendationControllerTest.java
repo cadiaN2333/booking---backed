@@ -1,7 +1,6 @@
 package com.example.booking.recommendation;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,23 +10,49 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ContextConfiguration;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import com.example.booking.config.AuthInterceptor;
+import com.example.booking.config.WebMvcConfig;
+import com.example.booking.common.GlobalExceptionHandler;
+import com.example.booking.mapper.UserMapper;
+import com.example.booking.service.TokenService;
+
+@WebMvcTest(RecommendationController.class)
+@Import({RecommendationController.class, WebMvcConfig.class, GlobalExceptionHandler.class})
+@ContextConfiguration(classes = RecommendationControllerTest.TestApplication.class)
 class RecommendationControllerTest {
 
-  private SlotRecommendationService service;
+  @SpringBootConfiguration
+  @EnableAutoConfiguration
+  static class TestApplication {
+
+    @Bean
+    AuthInterceptor authInterceptor(TokenService tokenService, UserMapper userMapper) {
+      return new AuthInterceptor(tokenService, userMapper);
+    }
+  }
+
+  @Autowired
   private MockMvc mockMvc;
 
-  @BeforeEach
-  void setUp() {
-    service = mock(SlotRecommendationService.class);
-    mockMvc = MockMvcBuilders.standaloneSetup(new RecommendationController(service)).build();
-  }
+  @MockBean
+  private SlotRecommendationService service;
+
+  @MockBean private TokenService tokenService;
+
+  @MockBean private UserMapper userMapper;
 
   @Test
   void recommend_通过只读入口返回规则推荐结果() throws Exception {
@@ -49,7 +74,8 @@ class RecommendationControllerTest {
 
     mockMvc
         .perform(
-            post("/recommendations/slots")
+            post("/api/recommendations/slots")
+                .contextPath("/api")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"courtId\":101,\"date\":\"2026-09-13\",\"tags\":[\"EVENING\"]}"))
         .andExpect(status().isOk())
@@ -64,5 +90,31 @@ class RecommendationControllerTest {
     org.assertj.core.api.Assertions.assertThat(captor.getValue().courtId()).isEqualTo(101L);
     org.assertj.core.api.Assertions.assertThat(captor.getValue().tags())
         .containsExactly(RecommendationTag.EVENING);
+  }
+
+  @Test
+  void recommend_非法日期返回参数不合法() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/recommendations/slots")
+                .contextPath("/api")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"courtId\":101,\"date\":\"2026-02-30\"}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(4000))
+        .andExpect(jsonPath("$.message").value("参数不合法"));
+  }
+
+  @Test
+  void recommend_未知标签返回参数不合法() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/recommendations/slots")
+                .contextPath("/api")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"courtId\":101,\"date\":\"2026-09-13\",\"tags\":[\"UNKNOWN\"]}"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code").value(4000))
+        .andExpect(jsonPath("$.message").value("参数不合法"));
   }
 }
