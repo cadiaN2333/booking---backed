@@ -3,6 +3,7 @@ package com.example.booking.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.example.booking.common.UserContext;
 import com.example.booking.common.BizException;
+import com.example.booking.domain.dto.MerchantCourtRequest;
 import com.example.booking.domain.entity.Court;
 import com.example.booking.domain.entity.Venue;
 import com.example.booking.mapper.CourtMapper;
@@ -11,6 +12,7 @@ import com.example.booking.service.CourtService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -47,9 +49,43 @@ public class CourtServiceImpl implements CourtService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
+  public Court create(MerchantCourtRequest request) {
+    requireMineVenue(request.getVenueId());
+    Court court = new Court();
+    copyFields(request, court);
+    court.setStatus(0);
+    court.setAuditStatus(0);
+    court.setAuditRemark(null);
+    court.setAuditTime(null);
+    court.setAuditBy(null);
+    courtMapper.insert(court);
+    return court;
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public Court update(Long courtId, MerchantCourtRequest request) {
+    Court court = getMine(courtId);
+    requireMineVenue(request.getVenueId());
+    copyFields(request, court);
+    resetForReview(court);
+    courtMapper.updateById(court);
+    return court;
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public void offline(Long courtId) {
+    Court court = getMine(courtId);
+    court.setStatus(0);
+    courtMapper.updateById(court);
+  }
+
+  @Override
   public Court getMine(Long courtId) {
     Court court = courtMapper.selectById(courtId);
-    if (court == null || !Integer.valueOf(1).equals(court.getStatus())) {
+    if (court == null) {
       throw new BizException("场地不存在");
     }
     Venue venue = venueMapper.selectById(court.getVenueId());
@@ -57,5 +93,34 @@ public class CourtServiceImpl implements CourtService {
       throw new BizException(4030, "无权操作该场地");
     }
     return court;
+  }
+
+  private Venue requireMineVenue(Long venueId) {
+    Venue venue = venueMapper.selectById(venueId);
+    if (venue == null) {
+      throw new BizException("场馆不存在");
+    }
+    if (!UserContext.userId().equals(venue.getMerchantId())) {
+      throw new BizException(4030, "无权操作该场馆下的场地");
+    }
+    return venue;
+  }
+
+  private void copyFields(MerchantCourtRequest request, Court court) {
+    court.setVenueId(request.getVenueId());
+    court.setName(request.getName());
+    court.setType(request.getType());
+    court.setPrice(request.getPrice());
+    court.setOpenTime(request.getOpenTime());
+    court.setCloseTime(request.getCloseTime());
+    court.setSlotMinutes(request.getSlotMinutes());
+  }
+
+  private void resetForReview(Court court) {
+    court.setStatus(0);
+    court.setAuditStatus(0);
+    court.setAuditRemark(null);
+    court.setAuditTime(null);
+    court.setAuditBy(null);
   }
 }
