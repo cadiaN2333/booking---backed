@@ -1,5 +1,6 @@
 package com.example.booking.controller;
 
+import com.example.booking.common.BizException;
 import com.example.booking.common.Result;
 import com.example.booking.domain.dto.AuditDecisionRequest;
 import com.example.booking.domain.vo.AdminReviewVO;
@@ -26,8 +27,23 @@ public class AdminController {
   @GetMapping("/reviews")
   public Result<List<AdminReviewVO>> listReviews(
       @RequestParam(defaultValue = "venue") String type,
-      @RequestParam(defaultValue = "0") Integer status) {
-    return Result.ok(adminAuditService.listReviews(type, status));
+      @RequestParam(defaultValue = "0") String status) {
+    return Result.ok(adminAuditService.listReviews(type, parseAuditStatus(status)));
+  }
+
+  private int parseAuditStatus(String status) {
+    if (status == null) {
+      return 0;
+    }
+    try {
+      int auditStatus = Integer.parseInt(status);
+      if (auditStatus >= 0 && auditStatus <= 2) {
+        return auditStatus;
+      }
+    } catch (NumberFormatException ignored) {
+      // 统一转换为审核状态业务错误，避免落入5000兜底异常。
+    }
+    throw new BizException(4000, "审核状态必须是0、1或2");
   }
 
   @PostMapping("/reviews/venues/{id}/approve")

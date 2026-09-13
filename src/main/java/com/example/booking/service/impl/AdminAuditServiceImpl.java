@@ -21,13 +21,15 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AdminAuditServiceImpl implements AdminAuditService {
 
+  private static final String INVALID_AUDIT_STATUS_MESSAGE = "审核状态必须是0、1或2";
+
   private final VenueMapper venueMapper;
   private final CourtMapper courtMapper;
 
   @Override
   public List<AdminReviewVO> listReviews(String type, Integer status) {
     String reviewType = type == null ? "venue" : type;
-    int auditStatus = status == null ? 0 : status;
+    int auditStatus = validateAuditStatus(status);
     if ("venue".equals(reviewType)) {
       return venueMapper
           .selectList(
@@ -49,6 +51,14 @@ public class AdminAuditServiceImpl implements AdminAuditService {
           .toList();
     }
     throw new BizException("审核资源类型只能是venue或court");
+  }
+
+  private int validateAuditStatus(Integer status) {
+    int auditStatus = status == null ? 0 : status;
+    if (auditStatus < 0 || auditStatus > 2) {
+      throw new BizException(4000, INVALID_AUDIT_STATUS_MESSAGE);
+    }
+    return auditStatus;
   }
 
   @Override
