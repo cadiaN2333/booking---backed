@@ -58,12 +58,24 @@ public class SlotServiceImpl implements SlotService {
     if (venue == null || !UserContext.userId().equals(venue.getMerchantId())) {
       throw new BizException(4030, "无权操作该场地");
     }
+    if (!isPublished(court) || !isPublished(venue)) {
+      throw new BizException(4030, "场地未审核通过或未上架");
+    }
 
     return generate(courtId, generateDays);
   }
 
   @Override
   public List<SlotVO> listByCourtAndDate(Long courtId, LocalDate date) {
+    Court court = courtMapper.selectById(courtId);
+    if (!isPublished(court)) {
+      return List.of();
+    }
+    Venue venue = venueMapper.selectById(court.getVenueId());
+    if (!isPublished(venue)) {
+      return List.of();
+    }
+
     try {
       return listByCourtAndDateWithCache(courtId, date);
     } catch (RuntimeException e) {
@@ -135,6 +147,16 @@ public class SlotServiceImpl implements SlotService {
             .stream()
             .map(s -> toVO(s, price))
             .toList();
+  }
+
+  private boolean isPublished(Court court) {
+    return court != null && Integer.valueOf(1).equals(court.getAuditStatus())
+        && Integer.valueOf(1).equals(court.getStatus());
+  }
+
+  private boolean isPublished(Venue venue) {
+    return venue != null && Integer.valueOf(1).equals(venue.getAuditStatus())
+        && Integer.valueOf(1).equals(venue.getStatus());
   }
 
   @Override
