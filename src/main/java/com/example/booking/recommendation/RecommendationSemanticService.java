@@ -57,7 +57,10 @@ public class RecommendationSemanticService {
             .query(resolvedQuery)
             .topK(1)
             .similarityThresholdAll()
-            .filterExpression("courtId == '" + courtId + "'")
+            .filterExpression(
+                "courtId == '"
+                    + courtId
+                    + "' && status == '1' && documentType == 'court_profile'")
             .build();
     List<Document> documents = vectorStore.similaritySearch(searchRequest);
     if (documents == null
@@ -82,10 +85,8 @@ public class RecommendationSemanticService {
       return false;
     }
     Map<String, Object> metadata = document.getMetadata();
-    Object status = metadata.get("status");
-    Object documentType = metadata.get("documentType");
     return Objects.equals(String.valueOf(courtId), String.valueOf(metadata.get("courtId")))
-        && (status == null || Objects.equals("1", String.valueOf(status)))
-        && (documentType == null || Objects.equals("court_profile", documentType));
+        && Objects.equals("1", String.valueOf(metadata.get("status")))
+        && Objects.equals("court_profile", metadata.get("documentType"));
   }
 }

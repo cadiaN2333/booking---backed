@@ -52,8 +52,50 @@ class RecommendationSemanticServiceTest {
     assertThat(captor.getValue().getTopK()).isOne();
     assertThat(captor.getValue().getFilterExpression()).isNotNull();
     assertThat(captor.getValue().getFilterExpression().toString())
-        .contains("courtId", "101")
-        .doesNotContain("status", "documentType");
+        .contains("courtId", "101", "status", "1", "documentType", "court_profile");
+  }
+
+  @Test
+  void enhance_缺失公开状态元数据时拒绝文档() {
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(
+            List.of(new Document("doc-1", "安静区", Map.of("courtId", "101", "documentType", "court_profile"))));
+
+    RecommendationEnhancement result =
+        service.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.isEmpty()).isTrue();
+  }
+
+  @Test
+  void enhance_缺失文档类型元数据时拒绝文档() {
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(List.of(new Document("doc-1", "安静区", Map.of("courtId", "101", "status", "1"))));
+
+    RecommendationEnhancement result =
+        service.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.isEmpty()).isTrue();
+  }
+
+  @Test
+  void enhance_非公开或非场地资料文档时拒绝文档() {
+    when(vectorStore.similaritySearch(any(SearchRequest.class)))
+        .thenReturn(
+            List.of(
+                new Document(
+                    "doc-1",
+                    "安静区",
+                    Map.of("courtId", "101", "status", "0", "documentType", "court_profile")),
+                new Document(
+                    "doc-2",
+                    "安静区",
+                    Map.of("courtId", "101", "status", "1", "documentType", "venue_profile"))));
+
+    RecommendationEnhancement result =
+        service.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.isEmpty()).isTrue();
   }
 
   @Test
