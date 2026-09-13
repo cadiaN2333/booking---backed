@@ -2,6 +2,13 @@
 -- 兼容已有库：首次增加审核字段时，历史资源迁移为审核通过且已上架；重复执行不会重置后续审核状态。
 USE `booking`;
 
+-- 新建审核资源默认下架；MODIFY COLUMN 可重复执行，且不改动已有行数据。
+ALTER TABLE `venue`
+  MODIFY COLUMN `status` TINYINT NOT NULL DEFAULT 0 COMMENT '1已上架 0下架';
+
+ALTER TABLE `court`
+  MODIFY COLUMN `status` TINYINT NOT NULL DEFAULT 0 COMMENT '1已上架 0下架';
+
 SET @venue_audit_status_exists := (
   SELECT COUNT(*)
   FROM information_schema.columns

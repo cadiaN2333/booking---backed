@@ -48,12 +48,12 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     // 管理员端接口只允许管理员访问，普通用户访问一律 403
     String path = request.getServletPath();
-    if (path.startsWith(ADMIN_PREFIX) && !UserRoleEnum.isAdmin(user.getRole())) {
+    if (matchesPath(path, ADMIN_PREFIX) && !UserRoleEnum.isAdmin(user.getRole())) {
       throw new BizException(4030, "无管理员权限");
     }
 
     // 商家端接口只允许商家访问，管理员也不能代替商家操作
-    if (path.startsWith(MERCHANT_PREFIX) && !UserRoleEnum.isMerchant(user.getRole())) {
+    if (matchesPath(path, MERCHANT_PREFIX) && !UserRoleEnum.isMerchant(user.getRole())) {
       throw new BizException(4030, "无商家权限");
     }
 
@@ -75,5 +75,9 @@ public class AuthInterceptor implements HandlerInterceptor {
       return header.substring(BEARER.length()).trim();
     }
     return null;
+  }
+
+  private boolean matchesPath(String path, String prefix) {
+    return path.equals(prefix) || path.startsWith(prefix + "/");
   }
 }

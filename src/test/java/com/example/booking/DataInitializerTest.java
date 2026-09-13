@@ -13,13 +13,23 @@ import com.example.booking.mapper.UserMapper;
 import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.SlotService;
 import java.util.List;
+import java.lang.reflect.Field;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.DefaultApplicationArguments;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class DataInitializerTest {
+
+  @Test
+  void 管理员密码配置读取BOOKING_ADMIN_PASSWORD并提供本地默认值() throws Exception {
+    Field field = DataInitializer.class.getDeclaredField("adminPassword");
+
+    assertThat(field.getAnnotation(Value.class).value())
+        .isEqualTo("${BOOKING_ADMIN_PASSWORD:Admin@123456}");
+  }
 
   @Test
   void 初始化时创建管理员并使用本地演示默认密码() {

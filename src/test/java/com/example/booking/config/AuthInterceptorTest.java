@@ -67,6 +67,16 @@ class AuthInterceptorTest {
     assertThatCode(() -> invoke("/merchant/venues", 1)).doesNotThrowAnyException();
   }
 
+  @Test
+  void administrator不是管理员路径() {
+    assertThatCode(() -> invoke("/administrator", 0)).doesNotThrowAnyException();
+  }
+
+  @Test
+  void merchantfoo不是商家路径() {
+    assertThatCode(() -> invoke("/merchantfoo", 0)).doesNotThrowAnyException();
+  }
+
   private void invoke(String path, int role) {
     HttpServletRequest request = request(path);
     when(tokenService.resolve("token")).thenReturn(9L);
