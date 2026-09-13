@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -79,11 +80,15 @@ public class GlobalRecommendationService {
   public GlobalRecommendationResponse search(GlobalRecommendationRequest request) {
     GlobalRecommendationRequest resolvedRequest =
         request == null ? new GlobalRecommendationRequest(null, null, null, null, null, null, null) : request;
+    LocalDate today = LocalDate.now(clock);
     LocalDate date = resolvedRequest.resolvedDate(clock);
+    if (date.isBefore(today)) {
+      return emptyResponse();
+    }
     SearchCriteria criteria = SearchCriteria.from(resolvedRequest);
     List<Candidate> candidates = buildCandidates(resolvedRequest, date, criteria);
     if (candidates.isEmpty()) {
-      return new GlobalRecommendationResponse(List.of(), true);
+      return emptyResponse();
     }
 
     List<Candidate> ranked =
@@ -139,7 +144,25 @@ public class GlobalRecommendationService {
                 queryBudgetMatch));
       }
     }
-    return decorate(candidates, criteria);
+    return decorate(deduplicateBySlotId(candidates), criteria);
+  }
+
+  private GlobalRecommendationResponse emptyResponse() {
+    return new GlobalRecommendationResponse(List.of(), true);
+  }
+
+  private List<Candidate> deduplicateBySlotId(List<Candidate> candidates) {
+    return candidates.stream()
+        .sorted(candidateComparator())
+        .collect(
+            Collectors.toMap(
+                candidate -> candidate.slot().getId(),
+                Function.identity(),
+                (preferred, ignored) -> preferred,
+                LinkedHashMap::new))
+        .values()
+        .stream()
+        .toList();
   }
 
   private Map<Long, Venue> publicVenues() {
@@ -468,6 +491,10 @@ public class GlobalRecommendationService {
 
     private boolean matchesStructuredFilters(SlotVO slot) {
       if (maxPrice != null && (slot.getPrice() == null || slot.getPrice() > maxPrice)) {
+        return false;
+      }
+      if (queryMaxPrice != null
+          && (slot.getPrice() == null || slot.getPrice() > queryMaxPrice)) {
         return false;
       }
       if (queryTimeWindow != null

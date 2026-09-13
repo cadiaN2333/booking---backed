@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
 public record RecommendationEnhancement(
     Map<Long, String> reasons, Map<Long, Set<RecommendationTag>> tags) {
 
+  static final int MAX_REASON_LENGTH = 200;
+
   public RecommendationEnhancement {
     reasons = normalizeReasons(reasons);
     tags = normalizeTags(tags);
@@ -59,11 +61,26 @@ public record RecommendationEnhancement(
     Map<Long, String> normalized = new LinkedHashMap<>();
     input.forEach(
         (slotId, reason) -> {
-          if (slotId != null && reason != null && !reason.isBlank()) {
-            normalized.put(slotId, reason.trim());
+          if (slotId != null && reason != null) {
+            String normalizedReason = reason.trim();
+            if (!normalizedReason.isBlank()) {
+              normalized.put(slotId, limitReasonLength(normalizedReason));
+            }
           }
         });
     return Map.copyOf(normalized);
+  }
+
+  private static String limitReasonLength(String reason) {
+    if (reason.length() <= MAX_REASON_LENGTH) {
+      return reason;
+    }
+    int endIndex = MAX_REASON_LENGTH;
+    if (Character.isHighSurrogate(reason.charAt(endIndex - 1))
+        && Character.isLowSurrogate(reason.charAt(endIndex))) {
+      endIndex--;
+    }
+    return reason.substring(0, endIndex);
   }
 
   private static Map<Long, Set<RecommendationTag>> normalizeTags(

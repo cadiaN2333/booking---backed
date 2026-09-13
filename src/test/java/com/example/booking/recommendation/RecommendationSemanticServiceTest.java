@@ -146,6 +146,24 @@ class RecommendationSemanticServiceTest {
   }
 
   @Test
+  void enhance_聊天理由会去除首尾空白并限制最大长度() {
+    String unsafeReason = "  " + "模型理由".repeat(100) + "  ";
+    when(chatModel.call(any(Prompt.class)))
+        .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("1|" + unsafeReason)))));
+    RecommendationSemanticService chatService =
+        new RecommendationSemanticService(vectorStoreProvider, chatModelProvider, false, true);
+
+    RecommendationEnhancement result =
+        chatService.enhance(List.of(candidate(1L)), 101L, "想要安静一些");
+
+    assertThat(result.reasonFor(1L)).hasValueSatisfying(reason -> {
+      assertThat(reason).isNotBlank();
+      assertThat(reason).doesNotStartWith(" ").doesNotEndWith(" ");
+      assertThat(reason).hasSize(200);
+    });
+  }
+
+  @Test
   void enhance_向量关闭但聊天开启时仍尝试ChatModel() {
     when(chatModel.call(any(Prompt.class)))
         .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("1|仅聊天理由")))));

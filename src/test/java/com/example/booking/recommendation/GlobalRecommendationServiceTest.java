@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.example.booking.domain.entity.Court;
@@ -135,6 +136,28 @@ class GlobalRecommendationServiceTest {
   }
 
   @Test
+  void search_查询预算作为硬过滤而不是只参与评分() {
+    Venue venue = venue(1L, "星辰羽毛球馆", 1, 1);
+    Court court = court(101L, 1L, "普通场", "羽毛球", 8000, 1, 1);
+    SlotVO withinBudget = slot(1L, 101L, TODAY, "18:00", 2, 10000);
+    SlotVO overBudget = slot(2L, 101L, TODAY, "19:00", 2, 10001);
+    SlotVO missingPrice = slot(3L, 101L, TODAY, "20:00", 2, 10000);
+    missingPrice.setPrice(null);
+    when(venueService.listOnline()).thenReturn(List.of(venue));
+    when(courtService.listOnlineByVenue(null)).thenReturn(List.of(court));
+    when(slotService.listByCourtAndDate(101L, TODAY))
+        .thenReturn(List.of(withinBudget, overBudget, missingPrice));
+
+    GlobalRecommendationResponse result =
+        service.search(
+            new GlobalRecommendationRequest(
+                "预算100元以内", TODAY, null, null, null, null, 5));
+
+    assertThat(result.recommendations()).extracting(GlobalRecommendationItem::slotId).containsExactly(1L);
+    assertThat(result.recommendations()).allMatch(item -> item.price() != null && item.price() <= 10000);
+  }
+
+  @Test
   void search_查询文本中的日期类型时间和预算参与规则排序且日期覆盖请求日期() {
     Venue venue = venue(1L, "星辰羽毛球馆", 1, 1);
     Court badminton = court(101L, 1L, "普通场", "羽毛球", 8000, 1, 1);
@@ -203,6 +226,43 @@ class GlobalRecommendationServiceTest {
     service.search(new GlobalRecommendationRequest(null, null, null, null, null, null, null));
 
     verify(slotService).listByCourtAndDate(101L, TODAY);
+  }
+
+  @Test
+  void search_指定历史日期统一返回空结果且不读取推荐资源() {
+    GlobalRecommendationResponse result =
+        service.search(
+            new GlobalRecommendationRequest(
+                null, TODAY.minusDays(1), null, null, null, null, 5));
+
+    assertThat(result.recommendations()).isEmpty();
+    assertThat(result.degraded()).isTrue();
+    verifyNoInteractions(venueService, courtService, slotService, semanticService);
+  }
+
+  @Test
+  void search_候选按时段编号去重并保留规则排序更优快照() {
+    Venue venue = venue(1L, "星辰羽毛球馆", 1, 1);
+    Court court = court(101L, 1L, "普通场", "羽毛球", 8000, 1, 1);
+    when(venueService.listOnline()).thenReturn(List.of(venue));
+    when(courtService.listOnlineByVenue(null)).thenReturn(List.of(court));
+    when(slotService.listByCourtAndDate(101L, TODAY))
+        .thenReturn(
+            List.of(
+                slot(1L, 101L, TODAY, "19:00", 1, 9000),
+                slot(1L, 101L, TODAY, "18:00", 5, 8000),
+                slot(2L, 101L, TODAY, "20:00", 2, 8000)));
+
+    GlobalRecommendationResponse result =
+        service.search(new GlobalRecommendationRequest(null, TODAY, null, null, null, null, 2));
+
+    assertThat(result.recommendations()).extracting(GlobalRecommendationItem::slotId).containsExactly(1L, 2L);
+    assertThat(result.recommendations().get(0))
+        .extracting(
+            GlobalRecommendationItem::startAt,
+            GlobalRecommendationItem::price,
+            GlobalRecommendationItem::available)
+        .containsExactly(LocalDateTime.of(TODAY, LocalTime.of(18, 0)), 8000, 5);
   }
 
   @Test
@@ -314,6 +374,29 @@ class GlobalRecommendationServiceTest {
             0L);
     assertThat(item.reason()).isEqualTo("参考静音区资料");
     assertThat(item.tags()).containsExactly(RecommendationTag.QUIET);
+  }
+
+  @Test
+  void search_语义理由必须去除首尾空白并限制最大长度() {
+    Venue venue = venue(1L, "星辰羽毛球馆", 1, 1);
+    Court court = court(101L, 1L, "普通场", "羽毛球", 8000, 1, 1);
+    String unsafeReason = "  " + "模型理由".repeat(100) + "  ";
+    when(venueService.listOnline()).thenReturn(List.of(venue));
+    when(courtService.listOnlineByVenue(null)).thenReturn(List.of(court));
+    when(slotService.listByCourtAndDate(101L, TODAY))
+        .thenReturn(List.of(slot(1L, 101L, TODAY, "18:00", 2, 8000)));
+    when(semanticService.enhance(any(), eq(101L), eq("安静一点")))
+        .thenReturn(new RecommendationEnhancement(Map.of(1L, unsafeReason), Map.of()));
+
+    GlobalRecommendationItem item =
+        service
+            .search(new GlobalRecommendationRequest("安静一点", TODAY, null, null, null, null, 5))
+            .recommendations()
+            .get(0);
+
+    assertThat(item.reason()).isNotBlank();
+    assertThat(item.reason()).doesNotStartWith(" ").doesNotEndWith(" ");
+    assertThat(item.reason()).hasSize(200);
   }
 
   private Venue venue(Long id, String name, int auditStatus, int status) {

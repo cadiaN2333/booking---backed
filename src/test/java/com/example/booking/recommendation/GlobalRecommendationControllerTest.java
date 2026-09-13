@@ -68,17 +68,24 @@ class GlobalRecommendationControllerTest {
                 .contextPath("/api")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
-                    "{\"query\":\"明天晚上\",\"date\":\"2026-09-13\",\"type\":\"羽毛球\",\"maxPrice\":10000,\"limit\":5}"))
+                    "{\"query\":\"明天晚上\",\"date\":\"2026-09-13\",\"type\":\"羽毛球\",\"startTime\":\"18:00\",\"endTime\":\"20:00\",\"maxPrice\":10000,\"limit\":5}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
         .andExpect(jsonPath("$.data.degraded", is(true)))
+        .andExpect(jsonPath("$.data.recommendations[0].venueId", is(1)))
         .andExpect(jsonPath("$.data.recommendations[0].venueName", is("星辰羽毛球馆")))
         .andExpect(jsonPath("$.data.recommendations[0].venueAddress", is("天河区体育西路 88 号")))
         .andExpect(jsonPath("$.data.recommendations[0].courtId", is(101)))
+        .andExpect(jsonPath("$.data.recommendations[0].courtName", is("1 号场")))
         .andExpect(jsonPath("$.data.recommendations[0].courtType", is("羽毛球")))
+        .andExpect(jsonPath("$.data.recommendations[0].slotId", is(11)))
+        .andExpect(jsonPath("$.data.recommendations[0].date", is("2026-09-13")))
+        .andExpect(jsonPath("$.data.recommendations[0].startAt", is("2026-09-13T18:00:00")))
+        .andExpect(jsonPath("$.data.recommendations[0].endAt", is("2026-09-13T19:00:00")))
         .andExpect(jsonPath("$.data.recommendations[0].price", is(8000)))
         .andExpect(jsonPath("$.data.recommendations[0].available", is(2)))
         .andExpect(jsonPath("$.data.recommendations[0].score", is(102)))
+        .andExpect(jsonPath("$.data.recommendations[0].tags[0]", is("EVENING")))
         .andExpect(jsonPath("$.data.recommendations[0].reason", is("匹配晚间可约时段")));
 
     ArgumentCaptor<GlobalRecommendationRequest> captor =
@@ -86,7 +93,10 @@ class GlobalRecommendationControllerTest {
     verify(service).search(captor.capture());
     GlobalRecommendationRequest request = captor.getValue();
     org.assertj.core.api.Assertions.assertThat(request.query()).isEqualTo("明天晚上");
+    org.assertj.core.api.Assertions.assertThat(request.date()).isEqualTo(LocalDate.of(2026, 9, 13));
     org.assertj.core.api.Assertions.assertThat(request.type()).isEqualTo("羽毛球");
+    org.assertj.core.api.Assertions.assertThat(request.startTime()).isEqualTo(java.time.LocalTime.of(18, 0));
+    org.assertj.core.api.Assertions.assertThat(request.endTime()).isEqualTo(java.time.LocalTime.of(20, 0));
     org.assertj.core.api.Assertions.assertThat(request.maxPrice()).isEqualTo(10000);
     org.assertj.core.api.Assertions.assertThat(request.limit()).isEqualTo(5);
   }
