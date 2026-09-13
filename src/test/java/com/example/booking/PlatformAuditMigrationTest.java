@@ -53,13 +53,11 @@ class PlatformAuditMigrationTest {
   }
 
   @Test
-  void 静态执行迁移条件可验证首次迁移历史数据且重复执行不重置() throws IOException {
+  void 解析迁移语句并执行状态模型可验证首次和重复行为() throws IOException {
     String migration = readResource("/db/migration-v5-platform-audit.sql");
 
-    assertThat(shouldMigrateHistory(migration, "venue", false)).isTrue();
-    assertThat(shouldMigrateHistory(migration, "venue", true)).isFalse();
-    assertThat(shouldMigrateHistory(migration, "court", false)).isTrue();
-    assertThat(shouldMigrateHistory(migration, "court", true)).isFalse();
+    assertMigrationState(migration, "venue");
+    assertMigrationState(migration, "court");
   }
 
   private String tableDefinition(String schema, String tableName) {
@@ -79,12 +77,38 @@ class PlatformAuditMigrationTest {
     return migration.substring(start, end);
   }
 
-  private boolean shouldMigrateHistory(String migration, String tableName, boolean alreadyMigrated) {
+  private void assertMigrationState(String migration, String tableName) {
+    HistoricalMigrationRule rule = parseHistoricalMigration(migration, tableName);
+    ResourceState pending = new ResourceState(0, 0);
+    ResourceState firstRun = rule.apply(pending, false);
+    assertThat(firstRun).as("首次迁移%s历史资源应变为已审核且已上架", tableName)
+        .isEqualTo(new ResourceState(1, 1));
+
+    ResourceState laterReviewed = new ResourceState(2, 0);
+    ResourceState repeatedRun = rule.apply(laterReviewed, true);
+    assertThat(repeatedRun).as("重复迁移%s不应重置后续审核状态", tableName)
+        .isEqualTo(laterReviewed);
+  }
+
+  private HistoricalMigrationRule parseHistoricalMigration(String migration, String tableName) {
     String marker = "@" + tableName + "_audit_status_exists";
     String updatePattern = "UPDATE `" + tableName
         + "`\\s+SET `audit_status` = 1,\\s+`status` = 1\\s+WHERE " + marker + " = 0";
-    assertThat(migration).containsPattern(updatePattern);
-    return !alreadyMigrated && migration.contains("WHERE " + marker + " = 0");
+    Matcher matcher = Pattern.compile("(?s)" + updatePattern + "\\s*;").matcher(migration);
+    assertThat(matcher.find()).as("应解析%s的历史资源更新语句", tableName).isTrue();
+    return new HistoricalMigrationRule(1, 1, marker, matcher.start(), matcher.end());
+  }
+
+  private record ResourceState(int auditStatus, int status) {}
+
+  private record HistoricalMigrationRule(
+      int approvedAuditStatus, int onlineStatus, String existenceMarker, int start, int end) {
+
+    private ResourceState apply(ResourceState current, boolean auditColumnAlreadyExists) {
+      return auditColumnAlreadyExists
+          ? current
+          : new ResourceState(approvedAuditStatus, onlineStatus);
+    }
   }
 
   private String readResource(String name) throws IOException {
