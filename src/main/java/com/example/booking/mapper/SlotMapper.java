@@ -19,7 +19,10 @@ public interface SlotMapper extends BaseMapper<Slot> {
   /** 下单预扣：available -1, locked +1 */
   @Update(
       "UPDATE slot SET available = available - 1, locked = locked + 1, version = version + 1 "
-          + "WHERE id = #{id} AND available > 0")
+          + "WHERE id = #{id} AND available > 0 AND start_at > NOW() "
+          + "AND EXISTS (SELECT 1 FROM court c JOIN venue v ON c.venue_id = v.id "
+          + "WHERE c.id = slot.court_id AND c.audit_status = 1 AND c.status = 1 "
+          + "AND v.audit_status = 1 AND v.status = 1)")
   int deductAvailable(@Param("id") Long id);
 
   /** 确认支付：locked -1, sold +1 */

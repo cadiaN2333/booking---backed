@@ -24,10 +24,24 @@ public class CourtServiceImpl implements CourtService {
 
   @Override
   public List<Court> listOnlineByVenue(Long venueId) {
+    List<Long> publicVenueIds =
+        venueMapper
+            .selectList(
+                new LambdaQueryWrapper<Venue>()
+                    .eq(Venue::getAuditStatus, 1)
+                    .eq(Venue::getStatus, 1))
+            .stream()
+            .map(Venue::getId)
+            .filter(Objects::nonNull)
+            .toList();
+    if (publicVenueIds.isEmpty()) {
+      return List.of();
+    }
     LambdaQueryWrapper<Court> q =
         new LambdaQueryWrapper<Court>()
             .eq(Court::getAuditStatus, 1)
-            .eq(Court::getStatus, 1);
+            .eq(Court::getStatus, 1)
+            .in(Court::getVenueId, publicVenueIds);
     if (venueId != null) {
       q.eq(Court::getVenueId, venueId);
     }

@@ -8,12 +8,14 @@ import com.example.booking.domain.entity.Court;
 import com.example.booking.domain.entity.IdempotentRecord;
 import com.example.booking.domain.entity.Reservation;
 import com.example.booking.domain.entity.Slot;
+import com.example.booking.domain.entity.Venue;
 import com.example.booking.domain.enums.ReservationStatusEnum;
 import com.example.booking.domain.vo.ReservationVO;
 import com.example.booking.mapper.CourtMapper;
 import com.example.booking.mapper.IdempotentMapper;
 import com.example.booking.mapper.ReservationMapper;
 import com.example.booking.mapper.SlotMapper;
+import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.ReleaseScheduler;
 import com.example.booking.service.ReservationService;
 import java.time.LocalDateTime;
@@ -44,6 +46,7 @@ public class ReservationServiceImpl implements ReservationService {
   private final IdempotentMapper idempotentMapper;
   private final ReleaseScheduler releaseScheduler;
   private final SlotCacheService slotCacheService;
+  private final VenueMapper venueMapper;
 
 
   /** 下单后锁定时长（分钟），超时未确认则释放 */
@@ -75,21 +78,24 @@ public class ReservationServiceImpl implements ReservationService {
     // userId 一律取登录态，前端传什么都不认，杜绝「替别人下单」
     Long userId = UserContext.userId();
 
-    // 1) 幂等：抢占令牌，失败说明是重复提交
+    // 1) 下单前重新校验公开状态和时段时间，不能只相信顾客端之前看到的推荐结果。
+    requireBookableSlot(request.getSlotId());
+
+    // 2) 幂等：抢占令牌，失败说明是重复提交
     int consumed = idempotentMapper.consume(request.getToken(), userId, BIZ_TYPE);
     if (consumed == 0) {
       throw new BizException("请勿重复提交");
     }
 
-    // 2) 重复预约校验。uk_user_slot 唯一索引是最后一道防线，这里只是提前给友好提示
+    // 3) 重复预约校验。uk_user_slot 唯一索引是最后一道防线，这里只是提前给友好提示
     if (reservationMapper.countActive(userId, request.getSlotId()) > 0) {
       throw new BizException("你已预约过该时段");
     }
 
-    // 3) Redis 仅用于削峰；不可用时降级到数据库最终裁决，不能阻断下单。
+    // 4) Redis 仅用于削峰；不可用时降级到数据库最终裁决，不能阻断下单。
     boolean cacheDeducted = tryDeductCache(request.getSlotId());
 
-    // 4) 数据库原子扣减是唯一最终裁决，整条下单链路只能执行一次。
+    // 5) 数据库原子扣减是唯一最终裁决，整条下单链路只能执行一次。
     if (slotMapper.deductAvailable(request.getSlotId()) == 0) {
       // DB 说没有了（Redis 计数漂了）→ 仅回补本次成功的预扣。
       if (cacheDeducted) {
@@ -122,7 +128,7 @@ public class ReservationServiceImpl implements ReservationService {
 
     idempotentMapper.finish(request.getToken(), r.getOrderNo());
 
-    // 4) 预约超时释放。主链路走延迟队列，另有每分钟的补偿 Job 兜底
+    // 6) 预约超时释放。主链路走延迟队列，另有每分钟的补偿 Job 兜底
     releaseScheduler.schedule(r.getOrderNo(), r.getExpireAt());
 
     safeEvictDay(slot.getCourtId(), slot.getBizDate().toString());
@@ -236,6 +242,35 @@ public class ReservationServiceImpl implements ReservationService {
   private int priceOf(Long courtId) {
     Court court = courtMapper.selectById(courtId);
     return court == null ? 0 : court.getPrice();
+  }
+
+  private void requireBookableSlot(Long slotId) {
+    Slot slot = slotMapper.selectById(slotId);
+    if (slot == null) {
+      throw new BizException("时段不存在");
+    }
+    if (slot.getStartAt() == null || !slot.getStartAt().isAfter(LocalDateTime.now())) {
+      throw new BizException("时段已开始，无法预约");
+    }
+    Court court = courtMapper.selectById(slot.getCourtId());
+    if (court == null) {
+      throw new BizException("场地不存在");
+    }
+    Venue venue = venueMapper.selectById(court.getVenueId());
+    if (!isPublished(court) || !isPublished(venue)) {
+      throw new BizException("场地暂不可预约");
+    }
+  }
+
+  private boolean isPublished(Court court) {
+    return Integer.valueOf(1).equals(court.getAuditStatus())
+        && Integer.valueOf(1).equals(court.getStatus());
+  }
+
+  private boolean isPublished(Venue venue) {
+    return venue != null
+        && Integer.valueOf(1).equals(venue.getAuditStatus())
+        && Integer.valueOf(1).equals(venue.getStatus());
   }
 
   /** Redis 预扣失败时回退数据库，不让缓存依赖影响交易正确性。 */

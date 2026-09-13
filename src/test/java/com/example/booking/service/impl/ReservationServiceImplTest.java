@@ -1,6 +1,8 @@
 package com.example.booking.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -11,12 +13,14 @@ import com.example.booking.domain.dto.CreateReservationRequest;
 import com.example.booking.domain.entity.Court;
 import com.example.booking.domain.entity.Reservation;
 import com.example.booking.domain.entity.Slot;
+import com.example.booking.domain.entity.Venue;
 import com.example.booking.domain.enums.ReservationStatusEnum;
 import com.example.booking.domain.vo.ReservationVO;
 import com.example.booking.mapper.CourtMapper;
 import com.example.booking.mapper.IdempotentMapper;
 import com.example.booking.mapper.ReservationMapper;
 import com.example.booking.mapper.SlotMapper;
+import com.example.booking.mapper.VenueMapper;
 import com.example.booking.service.ReleaseScheduler;
 import com.example.booking.service.SlotCacheService;
 import java.time.LocalDate;
@@ -31,6 +35,7 @@ class ReservationServiceImplTest {
   private ReservationMapper reservationMapper;
   private SlotMapper slotMapper;
   private CourtMapper courtMapper;
+  private VenueMapper venueMapper;
   private IdempotentMapper idempotentMapper;
   private ReleaseScheduler releaseScheduler;
   private SlotCacheService slotCacheService;
@@ -41,6 +46,7 @@ class ReservationServiceImplTest {
     reservationMapper = mock(ReservationMapper.class);
     slotMapper = mock(SlotMapper.class);
     courtMapper = mock(CourtMapper.class);
+    venueMapper = mock(VenueMapper.class);
     idempotentMapper = mock(IdempotentMapper.class);
     releaseScheduler = mock(ReleaseScheduler.class);
     slotCacheService = mock(SlotCacheService.class);
@@ -51,9 +57,11 @@ class ReservationServiceImplTest {
             courtMapper,
             idempotentMapper,
             releaseScheduler,
-            slotCacheService);
+            slotCacheService,
+            venueMapper);
     ReflectionTestUtils.setField(service, "lockMinutes", 15);
     UserContext.set(new UserContext.LoginUser(1L, "customer", "体验用户", 0));
+    when(venueMapper.selectById(1L)).thenReturn(publicVenue());
   }
 
   @AfterEach
@@ -112,13 +120,45 @@ class ReservationServiceImplTest {
     verify(releaseScheduler).finish("B1");
   }
 
+  @Test
+  void create_父场馆下架时不扣库存() {
+    CreateReservationRequest request = request("token-offline");
+    Venue offlineVenue = publicVenue();
+    offlineVenue.setStatus(0);
+    when(idempotentMapper.consume("token-offline", 1L, "RESERVATION")).thenReturn(1);
+    when(slotMapper.selectById(1L)).thenReturn(slotWithAvailable(1));
+    when(courtMapper.selectById(101L)).thenReturn(court());
+    when(venueMapper.selectById(1L)).thenReturn(offlineVenue);
+
+    assertThatThrownBy(() -> service.create(request))
+        .hasMessageContaining("场地暂不可预约");
+
+    verify(slotMapper, never()).deductAvailable(1L);
+  }
+
+  @Test
+  void create_时段已开始时不扣库存() {
+    CreateReservationRequest request = request("token-started");
+    Slot started = slotWithAvailable(1);
+    started.setStartAt(LocalDateTime.now().minusMinutes(1));
+    when(idempotentMapper.consume("token-started", 1L, "RESERVATION")).thenReturn(1);
+    when(slotMapper.selectById(1L)).thenReturn(started);
+    when(courtMapper.selectById(101L)).thenReturn(court());
+
+    assertThatThrownBy(() -> service.create(request))
+        .hasMessageContaining("时段已开始");
+
+    verify(slotMapper, never()).deductAvailable(1L);
+  }
+
   private Slot slotWithAvailable(int available) {
     Slot slot = new Slot();
     slot.setId(1L);
     slot.setCourtId(101L);
-    slot.setBizDate(LocalDate.of(2026, 9, 12));
-    slot.setStartAt(LocalDateTime.of(2026, 9, 12, 10, 0));
-    slot.setEndAt(LocalDateTime.of(2026, 9, 12, 11, 0));
+    LocalDate date = LocalDate.now().plusDays(1);
+    slot.setBizDate(date);
+    slot.setStartAt(LocalDateTime.of(date, java.time.LocalTime.of(10, 0)));
+    slot.setEndAt(LocalDateTime.of(date, java.time.LocalTime.of(11, 0)));
     slot.setAvailable(available);
     return slot;
   }
@@ -137,8 +177,26 @@ class ReservationServiceImplTest {
   private Court court() {
     Court court = new Court();
     court.setId(101L);
+    court.setVenueId(1L);
     court.setName("测试场地");
     court.setPrice(5000);
+    court.setAuditStatus(1);
+    court.setStatus(1);
     return court;
+  }
+
+  private Venue publicVenue() {
+    Venue venue = new Venue();
+    venue.setId(1L);
+    venue.setAuditStatus(1);
+    venue.setStatus(1);
+    return venue;
+  }
+
+  private CreateReservationRequest request(String token) {
+    CreateReservationRequest request = new CreateReservationRequest();
+    request.setToken(token);
+    request.setSlotId(1L);
+    return request;
   }
 }

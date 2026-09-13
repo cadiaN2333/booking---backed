@@ -36,14 +36,26 @@ class PlatformVisibilityServiceTest {
   @Test
   void 顾客场地列表同时过滤审核通过和已上架() {
     CourtMapper mapper = mock(CourtMapper.class);
-    when(mapper.selectList(any())).thenReturn(List.of());
+    VenueMapper venueMapper = mock(VenueMapper.class);
+    when(venueMapper.selectList(any())).thenReturn(List.of(publicVenue(1L)));
 
-    new CourtServiceImpl(mapper, mock(VenueMapper.class)).listOnlineByVenue(1L);
+    new CourtServiceImpl(mapper, venueMapper).listOnlineByVenue(1L);
 
     ArgumentCaptor<LambdaQueryWrapper<Court>> captor =
         ArgumentCaptor.forClass(LambdaQueryWrapper.class);
     verify(mapper).selectList(captor.capture());
     assertThat(captor.getValue().getExpression().getNormal()).hasSizeGreaterThan(5);
+  }
+
+  @Test
+  void 父场馆未公开时顾客场地列表为空且不查询场地() {
+    CourtMapper mapper = mock(CourtMapper.class);
+    VenueMapper venueMapper = mock(VenueMapper.class);
+    when(venueMapper.selectList(any())).thenReturn(List.of());
+
+    assertThat(new CourtServiceImpl(mapper, venueMapper).listOnlineByVenue(1L)).isEmpty();
+
+    org.mockito.Mockito.verifyNoInteractions(mapper);
   }
 
   @Test
@@ -60,5 +72,13 @@ class PlatformVisibilityServiceTest {
         ArgumentCaptor.forClass(LambdaQueryWrapper.class);
     verify(mapper).selectList(captor.capture());
     assertThat(captor.getValue().getExpression().getNormal()).hasSizeGreaterThan(3);
+  }
+
+  private Venue publicVenue(Long id) {
+    Venue venue = new Venue();
+    venue.setId(id);
+    venue.setAuditStatus(1);
+    venue.setStatus(1);
+    return venue;
   }
 }
