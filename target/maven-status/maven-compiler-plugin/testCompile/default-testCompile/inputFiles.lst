@@ -1,7 +1,0 @@
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\config\VectorStoreConfigTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\recommendation\KnowledgeControllerTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\recommendation\KnowledgeDocumentFactoryTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\recommendation\KnowledgeRebuildServiceTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\service\impl\ReservationServiceImplTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\service\impl\SlotServiceImplTest.java
-D:\booking-linked\booking-backend\src\test\java\com\example\booking\service\ReleaseSchedulerTest.java
